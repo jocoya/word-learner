@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>英文單字學習樂園</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#4A90D9" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="單字樂園" />
+</head>
+<body>
+
+  <!-- 首頁：選擇角色 -->
+  <div id="page-home" class="page active">
+    <div class="home-bg">
+      <h1 class="home-title">🌟 英文單字學習樂園 🌟</h1>
+      <p class="home-sub">選擇你的模式</p>
+      <div class="profile-cards">
+        <button class="profile-card baby" onclick="enterMode('baby')">
+          <div class="profile-icon"><svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="28" r="26" fill="#FFF3E0"/><circle cx="20" cy="24" r="3" fill="#333"/><circle cx="36" cy="24" r="3" fill="#333"/><path d="M20 36c4 4 12 4 16 0" stroke="#FF9800" stroke-width="2.5" stroke-linecap="round"/><circle cx="28" cy="12" r="4" fill="#FF9800"/></svg></div>
+          <div class="profile-name">小寶貝模式</div>
+          <div class="profile-desc">聽聽看、翻翻看</div>
+        </button>
+        <button class="profile-card kid" onclick="enterMode('kid')">
+          <div class="profile-icon"><svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="28" r="26" fill="#E8F5E9"/><circle cx="20" cy="24" r="3" fill="#333"/><circle cx="36" cy="24" r="3" fill="#333"/><path d="M20 36c4 4 12 4 16 0" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round"/><rect x="18" y="6" width="20" height="10" rx="5" fill="#4CAF50"/></svg></div>
+          <div class="profile-name">挑戰模式</div>
+          <div class="profile-desc">填空、拼字、說句子</div>
+        </button>
+      </div>
+      <button class="btn-manage" onclick="goTo('page-manage')">⚙️ 管理單字</button>
+      <button class="btn-manage" onclick="goTo('page-exams')">📝 考試複習包</button>
+      <button class="btn-manage" onclick="startDailyChallenge()">🔥 每日挑戰</button>
+      <button class="btn-manage" onclick="goTo('page-coins')">🪙 金幣庫</button>
+    </div>
+  </div>
+
+  <!-- 遊戲選擇頁 -->
+  <div id="page-games" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2 id="gamesTitle">選擇遊戲</h2>
+    </div>
+    <div class="game-source-select">
+      <label>單字來源：</label>
+      <select id="gameSource" onchange="updateGameSource()">
+        <option value="permanent">永久單字庫</option>
+        <option value="due">今日複習</option>
+      </select>
+    </div>
+    <div class="game-cards" id="gameCards"></div>
+  </div>
+
+  <!-- 單字管理頁 -->
+  <div id="page-manage" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>管理單字</h2>
+      <div class="top-actions">
+        <button class="btn-sm" onclick="showImportExport()">📤 匯出/匯入</button>
+      </div>
+    </div>
+    <div class="manage-body">
+      <div class="add-word-form">
+        <h3>新增單字</h3>
+        <div class="form-row">
+          <input id="newWord" type="text" placeholder="英文單字" />
+          <input id="newMeaning" type="text" placeholder="中文意思" />
+        </div>
+        <div class="form-row">
+          <select id="newPos">
+            <option value="">詞性（選填）</option>
+            <option value="noun">名詞 noun</option>
+            <option value="verb">動詞 verb</option>
+            <option value="adj">形容詞 adj</option>
+            <option value="adv">副詞 adv</option>
+            <option value="prep">介系詞 prep</option>
+            <option value="other">其他</option>
+          </select>
+          <input id="newAntonym" type="text" placeholder="反義詞（選填）" />
+        </div>
+        <div class="form-row">
+          <input id="newDefinition" type="text" placeholder="英英解釋（選填）" />
+          <button class="btn-upload" type="button" onclick="aiGenerateDefinition('newWord','newDefinition')">🤖 AI生成</button>
+        </div>
+        <div class="form-row">
+          <input id="newTags" type="text" placeholder="標籤（逗號分隔，如 animal, pet）" />
+        </div>
+        <div class="form-row">
+          <input id="newSentence1" type="text" placeholder="例句 1" />
+        </div>
+        <div class="form-row">
+          <input id="newSentence2" type="text" placeholder="例句 2（選填）" />
+        </div>
+        <div class="form-row">
+          <input id="newSentence3" type="text" placeholder="例句 3（選填）" />
+        </div>
+        <div class="form-row">
+          <input id="newImageUrl1" type="text" placeholder="圖片 1 URL（選填）" />
+          <button class="btn-upload" type="button" onclick="searchImages('newWord', 'imageSearchResults', 'newImageUrl1')">🔍 搜圖</button>
+        </div>
+        <div class="form-row">
+          <input id="newImageUrl2" type="text" placeholder="圖片 2 URL（選填）" />
+          <button class="btn-upload" type="button" onclick="searchImages('newWord', 'imageSearchResults', 'newImageUrl2')">🔍 搜圖</button>
+        </div>
+        <div class="form-row">
+          <input id="newImageUrl3" type="text" placeholder="圖片 3 URL（選填）" />
+          <button class="btn-upload" type="button" onclick="searchImages('newWord', 'imageSearchResults', 'newImageUrl3')">🔍 搜圖</button>
+          <label class="btn-upload">
+            📷 相簿
+            <input id="newImageFile" type="file" accept="image/*" onchange="handleImageUpload(event)" hidden />
+          </label>
+          <label class="btn-upload">
+            📸 拍照
+            <input type="file" accept="image/*" capture="environment" onchange="handleImageUpload(event)" hidden />
+          </label>
+        </div>
+        <div id="imageSearchResults" class="image-search-results" hidden></div>
+        <div id="imagePreview" class="image-preview" hidden></div>
+        <button class="btn-primary" onclick="addWord()">新增</button>
+      </div>
+      <div class="word-list-header">
+        <h3>單字列表 <span id="wordCount" style="color:#999;font-weight:400;font-size:.85em;"></span></h3>
+        <input id="wordSearch" type="text" placeholder="搜尋..." oninput="renderWordList()" />
+      </div>
+      <div class="word-filter-row">
+        <select id="wordFilter" onchange="renderWordList()">
+          <option value="all">全部</option>
+          <option value="no-image">缺圖片</option>
+          <option value="no-sentence">缺例句</option>
+        </select>
+        <select id="posFilter" onchange="renderWordList()">
+          <option value="all">所有詞性</option>
+          <option value="noun">名詞</option>
+          <option value="verb">動詞</option>
+          <option value="adj">形容詞</option>
+          <option value="adv">副詞</option>
+          <option value="prep">介系詞</option>
+          <option value="other">其他</option>
+          <option value="none">未設定</option>
+        </select>
+        <select id="tagFilter" onchange="renderWordList()">
+          <option value="all">所有標籤</option>
+        </select>
+      </div>
+      <div id="wordList" class="word-list"></div>
+    </div>
+  </div>
+
+  <!-- 考試複習包 -->
+  <div id="page-exams" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>考試複習包</h2>
+    </div>
+    <div class="manage-body">
+      <div class="add-word-form">
+        <h3>新增考試包</h3>
+        <div class="form-row">
+          <input id="examName" type="text" placeholder="主題名稱（如 Unit 3 - Animals）" />
+          <input id="examDate" type="date" />
+        </div>
+        <button class="btn-primary" onclick="addExam()">建立</button>
+      </div>
+      <div id="examList" class="exam-list"></div>
+    </div>
+  </div>
+
+  <!-- 考試包詳情 -->
+  <div id="page-exam-detail" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-exams')">← 返回</button>
+      <h2 id="examDetailTitle">考試包</h2>
+      <div class="top-actions">
+        <button class="btn-sm btn-green" onclick="startExamPractice()">▶ 開始練習</button>
+        <button class="btn-sm btn-orange" onclick="graduateExam()">🎓 畢業到永久庫</button>
+      </div>
+    </div>
+    <div class="manage-body">
+      <div class="add-word-form">
+        <h3>加入單字</h3>
+        <div class="form-row">
+          <input id="examNewWord" type="text" placeholder="英文單字" />
+          <input id="examNewMeaning" type="text" placeholder="中文意思" />
+        </div>
+        <div class="form-row">
+          <input id="examNewSentence1" type="text" placeholder="例句 1" />
+        </div>
+        <div class="form-row">
+          <input id="examNewImageUrl" type="text" placeholder="圖片 URL（選填）" />
+          <button class="btn-upload" type="button" onclick="searchImages('examNewWord', 'examImageSearchResults')">🔍 搜圖</button>
+          <label class="btn-upload">
+            📷 相簿
+            <input id="examNewImageFile" type="file" accept="image/*" onchange="handleExamImageUpload(event)" hidden />
+          </label>
+          <label class="btn-upload">
+            📸 拍照
+            <input type="file" accept="image/*" capture="environment" onchange="handleExamImageUpload(event)" hidden />
+          </label>
+        </div>
+        <div id="examImageSearchResults" class="image-search-results" hidden></div>
+        <div id="examImagePreview" class="image-preview" hidden></div>
+        <button class="btn-primary" onclick="addExamWord()">新增</button>
+      </div>
+      <div id="examWordList" class="word-list"></div>
+    </div>
+  </div>
+
+  <!-- 匯出匯入對話框 -->
+  <div id="modal-import" class="modal" hidden>
+    <div class="modal-content">
+      <h3>匯出 / 匯入</h3>
+      <button class="btn-primary" onclick="exportAllData()">📤 匯出全部資料 (JSON)</button>
+      <div class="form-row" style="margin-top:12px">
+        <label class="btn-upload" style="flex:1;text-align:center">
+          📥 匯入 JSON 檔案
+          <input type="file" accept=".json" onchange="importAllData(event)" hidden />
+        </label>
+      </div>
+      <button class="btn-ghost" onclick="hideModal('modal-import')">關閉</button>
+    </div>
+  </div>
+
+  <!-- 每日挑戰：選角色 -->
+  <div id="page-daily-pick" class="page">
+    <div class="home-bg">
+      <h1 class="home-title" style="font-size:1.8em;">🔥 每日挑戰</h1>
+      <p class="home-sub">誰要來挑戰？</p>
+      <div class="profile-cards">
+        <button class="profile-card baby" onclick="startDailyWithRole('boy')">
+          <div class="profile-icon">👦</div>
+          <div class="profile-name">小男生</div>
+        </button>
+        <button class="profile-card kid" onclick="startDailyWithRole('girl')">
+          <div class="profile-icon">👧</div>
+          <div class="profile-name">小女生</div>
+        </button>
+      </div>
+      <button class="btn-manage" onclick="goTo('page-home')">← 返回</button>
+    </div>
+  </div>
+
+  <!-- 每日挑戰頁 -->
+  <div id="page-daily" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>🔥 每日挑戰</h2>
+      <div class="game-score" id="dailyScore"></div>
+    </div>
+    <div id="dailyArea" class="game-area"></div>
+  </div>
+
+  <!-- 金幣庫 -->
+  <div id="page-coins" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>🪙 金幣庫</h2>
+    </div>
+    <div class="manage-body">
+      <div class="coin-summary" id="coinSummary"></div>
+      <div class="reward-summary" id="rewardSummary"></div>
+      <div class="calendar-section" id="calendarSection"></div>
+      <div class="coin-log" id="coinLog"></div>
+    </div>
+  </div>
+
+  <!-- 寶箱 modal -->
+  <div id="modal-chest" class="modal" hidden>
+    <div class="chest-modal">
+      <div class="chest-stage" id="chestStage">
+        <img class="chest-img chest-shake" id="chestImg" src="./images/BOX.png" alt="寶箱" onclick="openChest()">
+        <div class="chest-hint">點擊寶箱打開！</div>
+      </div>
+      <div class="chest-reward" id="chestReward" hidden>
+        <div class="chest-reward-img" id="chestRewardImg"></div>
+        <div class="chest-reward-text" id="chestRewardText"></div>
+        <button class="btn-primary" onclick="closeChestModal()">太棒了！</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 確認歸零 modal -->
+  <div id="modal-redeem" class="modal" hidden>
+    <div class="modal-content" style="text-align:center;">
+      <h3 id="redeemTitle">確定要領取嗎？</h3>
+      <p id="redeemDesc"></p>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
+        <button class="btn-primary" onclick="confirmRedeem()">✓ 確定</button>
+        <button class="btn-ghost" onclick="hideModal('modal-redeem')">✕ 取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 編輯單字對話框 -->
+  <div id="modal-edit" class="modal" hidden></div>
+
+  <!-- 遊戲區域 -->
+  <div id="page-game" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="exitGame()">← 離開</button>
+      <h2 id="gameTitle">遊戲</h2>
+      <div class="game-score" id="gameScore"></div>
+    </div>
+    <div id="gameArea" class="game-area"></div>
+  </div>
+
+  <!-- 遊戲結算 -->
+  <div id="page-result" class="page">
+    <div class="result-screen">
+      <div class="result-stars" id="resultStars"></div>
+      <div class="result-msg" id="resultMsg"></div>
+      <div class="result-stats" id="resultStats"></div>
+      <div id="resultCoinArea" style="margin:8px 0;font-size:1.5em;"></div>
+      <button class="btn-primary" onclick="goTo('page-games')">再玩一次</button>
+      <button class="btn-ghost" onclick="goTo('page-home')">回首頁</button>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="db.js"></script>
+  <script src="games/memory.js"></script>
+  <script src="games/listen.js"></script>
+  <script src="games/fillblank.js"></script>
+  <script src="games/spelling.js"></script>
+  <script src="games/speak.js"></script>
+  <script src="games/bubble.js"></script>
+  <script src="games/echo.js"></script>
+  <script src="games/flashlight.js"></script>
+  <script src="games/detective.js"></script>
+  <script src="app.js"></script>
+  <script src="coins.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+</body>
+</html>

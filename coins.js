@@ -1,0 +1,192 @@
+// ===== 金幣庫（獨立模組）=====
+// 覆蓋 app.js 中的 renderCoinPage, redeemCoins, renderCalendar
+
+var pendingRedeemKey = null;
+var REWARDS = [
+  { key: '3C', name: '3C禮卷', img: './images/3C.png' },
+  { key: 'D', name: '甜點禮卷', img: './images/D.png' },
+  { key: 'B', name: '購物禮卷', img: './images/B.png' },
+  { key: 'TV', name: 'TV禮卷', img: './images/TV.png' },
+  { key: 'diamond', name: '鑽石', img: './images/diamond.png' },
+];
+
+async function renderCoinPage() {
+  var daily = await getDailyData();
+  var coins = await getCoins();
+  // 金幣卡
+  document.getElementById('coinSummary').innerHTML =
+    '<div class="coin-card">' +
+      '<div class="coin-card-row">' +
+        '<span style="font-size:3em;">👦</span>' +
+        '<img src="./images/COIN_CAT.png" style="width:56px;height:56px;object-fit:contain;">' +
+        '<span class="coin-card-count">' + coins.boy + '</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="coin-card">' +
+      '<div class="coin-card-row">' +
+        '<span style="font-size:3em;">👧</span>' +
+        '<img src="./images/COIN_DOG.png" style="width:56px;height:56px;object-fit:contain;">' +
+        '<span class="coin-card-count">' + coins.girl + '</span>' +
+      '</div>' +
+    '</div>';
+
+  // 獎勵統計
+  var rewards = coins.rewards || {};
+  var html = '<h3 style="margin:0 0 8px;">獎勵收藏（點擊領取歸零）</h3>';
+  var allItems = [
+    { key: 'boy', name: '貓幣', img: './images/COIN_CAT.png', count: coins.boy },
+    { key: 'girl', name: '狗幣', img: './images/COIN_DOG.png', count: coins.girl },
+  ];
+  REWARDS.forEach(function(r) {
+    allItems.push({ key: r.key, name: r.name, img: r.img, count: rewards[r.key] || 0 });
+  });
+  html += '<div style="display:flex;flex-wrap:wrap;gap:10px;">';
+  allItems.forEach(function(item) {
+    html += '<div class="reward-item" onclick="askRedeem(\'' + item.key + '\',\'' + esc(item.name) + '\',' + item.count + ')">' +
+      '<img src="' + item.img + '" alt="' + esc(item.name) + '">' +
+      '<span class="reward-item-count">x ' + item.count + '</span>' +
+    '</div>';
+  });
+  html += '</div>';
+  document.getElementById('rewardSummary').innerHTML = html;
+
+  renderCalendar(daily.completedDates);
+
+  // 紀錄
+  var logEl = document.getElementById('coinLog');
+  if (coins.log.length === 0) {
+    logEl.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">還沒有紀錄</p>';
+  } else {
+    logEl.innerHTML = coins.log.slice(-20).reverse().map(function(l) {
+      var icon = l.role === 'boy'
+        ? '<img src="./images/COIN_CAT.png" style="width:24px;">'
+        : '<img src="./images/COIN_DOG.png" style="width:24px;">';
+      var text = l.redeemed
+        ? '已領取 ' + l.redeemed
+        : (l.chest ? '開寶箱: ' + l.chest : '+' + l.count);
+      return '<div class="coin-log-item"><div class="coin-log-date">' + l.date +
+        '</div><div class="coin-log-icon">' + icon +
+        '</div><div class="coin-log-text">' + text + '</div></div>';
+    }).join('');
+  }
+
+  // 檢查是否可以開寶箱
+  checkChestReward();
+}
+
+function askRedeem(key, name, count) {
+  if (count === 0) return;
+  pendingRedeemKey = key;
+  document.getElementById('redeemTitle').textContent = '確定要領取嗎？';
+  document.getElementById('redeemDesc').textContent = name + ' x ' + count + ' 將歸零';
+  document.getElementById('modal-redeem').hidden = false;
+}
+
+async function confirmRedeem() {
+  if (!pendingRedeemKey) return;
+  var coins = await getCoins();
+  if (pendingRedeemKey === 'boy') {
+    coins.log.push({ role: 'boy', count: 0, date: getTodayStr(), redeemed: coins.boy });
+    coins.boy = 0;
+  } else if (pendingRedeemKey === 'girl') {
+    coins.log.push({ role: 'girl', count: 0, date: getTodayStr(), redeemed: coins.girl });
+    coins.girl = 0;
+  } else {
+    var rewards = coins.rewards || {};
+    coins.log.push({ role: '-', count: 0, date: getTodayStr(), redeemed: rewards[pendingRedeemKey] || 0, chest: pendingRedeemKey });
+    rewards[pendingRedeemKey] = 0;
+    coins.rewards = rewards;
+  }
+  await saveCoins(coins);
+  hideModal('modal-redeem');
+  pendingRedeemKey = null;
+  renderCoinPage();
+}
+
+// 寶箱邏輯
+async function checkChestReward() {
+  var daily = await getDailyData();
+  var coins = await getCoins();
+  // 收集所有完成的日期（不分角色）
+  var dates = [];
+  daily.completedDates.forEach(function(d) {
+    var dateOnly = d.replace(/^(boy|girl)-/, '');
+    if (dates.indexOf(dateOnly) === -1) dates.push(dateOnly);
+  });
+  dates.sort();
+  var lastChestDate = coins.lastChestDate || '';
+  // 計算從 lastChestDate 之後的連續天數
+  var streak = 0;
+  var d = new Date();
+  for (var i = 0; i < 30; i++) {
+    var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    if (ds <= lastChestDate) break;
+    if (dates.indexOf(ds) !== -1) streak++;
+    else if (i > 0) break;
+    d.setDate(d.getDate() - 1);
+  }
+  if (streak >= 7) showChestModal();
+}
+
+function showChestModal() {
+  var img = document.getElementById('chestImg');
+  img.src = './images/BOX.png';
+  img.className = 'chest-img chest-shake';
+  img.style.pointerEvents = 'auto';
+  document.getElementById('chestStage').hidden = false;
+  document.getElementById('chestReward').hidden = true;
+  document.getElementById('modal-chest').hidden = false;
+}
+
+async function openChest() {
+  var img = document.getElementById('chestImg');
+  img.classList.remove('chest-shake');
+  img.src = './images/OPEN%20BOX.png';
+  img.classList.add('chest-open-anim');
+  img.style.pointerEvents = 'none';
+  var reward = REWARDS[Math.floor(Math.random() * REWARDS.length)];
+  setTimeout(async function() {
+    document.getElementById('chestStage').hidden = true;
+    document.getElementById('chestReward').hidden = false;
+    document.getElementById('chestRewardImg').innerHTML = '<img src="' + reward.img + '">';
+    document.getElementById('chestRewardText').textContent = '獲得 ' + reward.name + '！';
+    var coins = await getCoins();
+    var rewards = coins.rewards || {};
+    rewards[reward.key] = (rewards[reward.key] || 0) + 1;
+    coins.rewards = rewards;
+    coins.lastChestDate = getTodayStr();
+    coins.log.push({ role: '-', count: 0, date: getTodayStr(), chest: reward.name });
+    await saveCoins(coins);
+  }, 800);
+}
+
+function closeChestModal() {
+  hideModal('modal-chest');
+  renderCoinPage();
+}
+
+// 覆蓋 renderCalendar — 用圖片代替 emoji
+function renderCalendar(completedDates) {
+  var now = new Date(), year = now.getFullYear(), month = now.getMonth();
+  var firstDay = new Date(year, month, 1).getDay();
+  var daysInMonth = new Date(year, month + 1, 0).getDate();
+  var today = now.getDate();
+  var mN = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  var h = '<h3 style="margin-bottom:8px;">' + mN[month] + ' ' + year + '</h3><div class="calendar-grid">';
+  ['日','一','二','三','四','五','六'].forEach(function(d) { h += '<div class="calendar-header">' + d + '</div>'; });
+  for (var i = 0; i < firstDay; i++) h += '<div class="calendar-day empty"></div>';
+  for (var d = 1; d <= daysInMonth; d++) {
+    var ds = year + '-' + String(month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    var boy = completedDates.indexOf('boy-' + ds) !== -1;
+    var girl = completedDates.indexOf('girl-' + ds) !== -1;
+    var cls = 'calendar-day';
+    if (boy || girl) cls += ' completed';
+    if (d === today) cls += ' today';
+    var icons = '';
+    if (boy) icons += '<img src="./images/COIN_CAT.png" style="width:16px;">';
+    if (girl) icons += '<img src="./images/COIN_DOG.png" style="width:16px;">';
+    h += '<div class="' + cls + '">' + (icons || d) + '</div>';
+  }
+  h += '</div>';
+  document.getElementById('calendarSection').innerHTML = h;
+}
