@@ -159,8 +159,23 @@ async function updateProgress(wordId, correct) {
   await dbPut('progress', p);
 }
 
-// ===== Gemini AI 英英解釋 =====
-const GEMINI_KEY = 'AIzaSyAUtXXb_uEuo4G_KTem6O6SEqwgeru7ylk';
+// ===== 本地 AI（Ollama）英英解釋 + 例句生成 =====
+// 電腦上用 localhost，平板/手機透過 Tailscale 用固定 IP
+const OLLAMA_HOST = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:11434'
+  : 'http://100.125.96.108:11434';
+const OLLAMA_URL = OLLAMA_HOST + '/api/generate';
+const OLLAMA_MODEL = 'bjoernb/gemma4-e4b-fast';
+
+async function ollamaGenerate(prompt) {
+  var res = await fetch(OLLAMA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: OLLAMA_MODEL, prompt: prompt, stream: false })
+  });
+  var data = await res.json();
+  return (data.response || '').trim();
+}
 
 async function aiGenerateDefinition(wordInputId, defInputId) {
   var word = document.getElementById(wordInputId).value.trim();
@@ -168,29 +183,56 @@ async function aiGenerateDefinition(wordInputId, defInputId) {
   var defInput = document.getElementById(defInputId);
   defInput.value = '生成中...';
   try {
-    var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: "You are an English teacher for an 8-year-old child. Explain the English word '" + word + "' in one very simple, short English sentence. Only use basic vocabulary. Do not use complex grammar. Return ONLY the English sentence, without any greetings or quotes.\n\nExamples:\nWord: apple\nExplanation: It is a round, red or green fruit that is sweet and crunchy.\nWord: jump\nExplanation: You push yourself up into the air using your legs.\nWord: " + word + "\nExplanation:" }] }]
-      })
-    });
-    var data = await res.json();
-    console.log('Gemini response:', JSON.stringify(data));
-    if (data.error) {
-      defInput.value = '';
-      alert('API 錯誤：' + data.error.message);
-      return;
-    }
-    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
-      defInput.value = data.candidates[0].content.parts[0].text.trim();
-    } else {
-      defInput.value = '';
-      alert('AI 回傳格式異常，請查看 Console');
-    }
+    var text = await ollamaGenerate(
+      "Explain the English word '" + word + "' in the simplest way possible. Use very basic words that even a 4-year-old can understand. One short sentence only. Return ONLY the sentence.\n\nWord: cat\nExplanation: A small furry animal that says meow.\nWord: happy\nExplanation: When you smile because you feel good.\nWord: " + word + "\nExplanation:"
+    );
+    // 清理多餘的換行和引號
+    text = text.replace(/^["'\s]+|["'\s]+$/g, '').split('\n')[0];
+    defInput.value = text || '(生成失敗)';
   } catch (e) {
     defInput.value = '';
-    alert('AI 生成失敗：' + e.message);
+    alert('AI 生成失敗（請確認 Ollama 有在執行）：' + e.message);
+  }
+}
+
+async function aiGenerateSentence(wordInputId, sentenceInputId) {
+  var word = document.getElementById(wordInputId).value.trim();
+  if (!word) return alert('請先輸入英文單字');
+  var senInput = document.getElementById(sentenceInputId);
+  senInput.value = '生成中...';
+
+  // 收集已有的例句，告訴模型不要重複
+  var existing = [];
+  var prefix = sentenceInputId.replace(/\d$/, '');
+  for (var i = 1; i <= 3; i++) {
+    var el = document.getElementById(prefix + i);
+    if (el && el.value && el.value !== '生成中...' && el !== senInput) {
+      existing.push(el.value.trim());
+    }
+  }
+  var avoidText = '';
+  if (existing.length > 0) {
+    avoidText = '\n\nDo NOT use these sentences (already used):\n- ' + existing.join('\n- ') + '\n\nWrite a DIFFERENT sentence:';
+  }
+
+  // 隨機選一個難度等級（4歲到10歲）
+  var levels = [
+    { age: 4, desc: 'a 4-year-old (very simple, 5-6 words, about toys, food, animals)', ex: 'I like my red ball.' },
+    { age: 6, desc: 'a 6-year-old (simple, 6-8 words, about school, friends, playing)', ex: 'We play together in the park after school.' },
+    { age: 8, desc: 'an 8-year-old (natural, 8-10 words, about daily life, hobbies)', ex: 'My sister always reads a book before bedtime.' },
+    { age: 10, desc: 'a 10-year-old (slightly advanced, 8-12 words, about experiences, feelings)', ex: 'The whole class was excited about the field trip.' }
+  ];
+  var level = levels[Math.floor(Math.random() * levels.length)];
+
+  try {
+    var text = await ollamaGenerate(
+      "Write one English sentence using the word '" + word + "' for " + level.desc + ". Return ONLY the sentence." + avoidText + "\n\nExample for age " + level.age + ": " + level.ex + "\nWord: " + word + "\nSentence:"
+    );
+    text = text.replace(/^["'\s]+|["'\s]+$/g, '').split('\n')[0];
+    senInput.value = text || '(生成失敗)';
+  } catch (e) {
+    senInput.value = '';
+    alert('例句生成失敗（請確認 Ollama 有在執行）：' + e.message);
   }
 }
 
@@ -219,13 +261,38 @@ async function searchImages(wordInputId, resultsContainerId, targetInputId) {
 function selectSearchImage(el, resultsContainerId) {
   el.parentElement.querySelectorAll('.image-search-item').forEach(i => i.classList.remove('selected'));
   el.classList.add('selected');
-  const imgUrl = el.dataset.url;
-  if (currentImageTarget) document.getElementById(currentImageTarget).value = imgUrl;
+  const pixabayUrl = el.dataset.url;
+
+  // 自動轉存到 Firebase Storage
+  if (currentImageTarget) {
+    const targetInput = document.getElementById(currentImageTarget);
+    if (currentImageTarget === 'editNewImgUrl') {
+      // 編輯模式：加入新的圖片行
+      targetInput.value = '上傳中...';
+      uploadPixabayImage(pixabayUrl, 'img').then(function(firebaseUrl) {
+        targetInput.value = '';
+        addEditImageRow(firebaseUrl);
+      });
+    } else {
+      targetInput.value = '上傳中...';
+      targetInput.style.color = '#FF9800';
+      uploadPixabayImage(pixabayUrl, targetInput.id || 'img').then(function(firebaseUrl) {
+        targetInput.value = firebaseUrl;
+        if (firebaseUrl.includes('firebasestorage')) {
+          targetInput.style.color = '#4CAF50';
+        } else {
+          targetInput.style.color = '#f44336';
+        }
+        setTimeout(function() { targetInput.style.color = ''; }, 3000);
+      });
+    }
+  }
+
   const previewId = resultsContainerId === 'imageSearchResults' ? 'imagePreview' : 'examImagePreview';
   const preview = document.getElementById(previewId);
   if (preview) {
     const img = document.createElement('img');
-    img.src = imgUrl; img.alt = '預覽'; img.style.cssText = 'max-height:80px;border-radius:8px;margin:4px;';
+    img.src = pixabayUrl; img.alt = '預覽'; img.style.cssText = 'max-height:80px;border-radius:8px;margin:4px;';
     preview.appendChild(img); preview.hidden = false;
   }
 }
@@ -383,17 +450,20 @@ async function editWord(id) {
       <div class="form-row">
         <input id="editTags" type="text" placeholder="標籤（逗號分隔）" value="${esc(tags)}" />
       </div>
-      <div class="form-row"><input id="editSentence1" type="text" placeholder="例句 1" value="${esc(sentences[0]||'')}" /></div>
-      <div class="form-row"><input id="editSentence2" type="text" placeholder="例句 2" value="${esc(sentences[1]||'')}" /></div>
-      <div class="form-row"><input id="editSentence3" type="text" placeholder="例句 3" value="${esc(sentences[2]||'')}" /></div>
+      <div class="form-row"><input id="editSentence1" type="text" placeholder="例句 1" value="${esc(sentences[0]||'')}" /><button class="btn-upload" type="button" onclick="aiGenerateSentence('editWord','editSentence1')">🤖</button></div>
+      <div class="form-row"><input id="editSentence2" type="text" placeholder="例句 2" value="${esc(sentences[1]||'')}" /><button class="btn-upload" type="button" onclick="aiGenerateSentence('editWord','editSentence2')">🤖</button></div>
+      <div class="form-row"><input id="editSentence3" type="text" placeholder="例句 3" value="${esc(sentences[2]||'')}" /><button class="btn-upload" type="button" onclick="aiGenerateSentence('editWord','editSentence3')">🤖</button></div>
       <div style="margin-bottom:8px;font-weight:600;">圖片</div>
       <div id="editImagesContainer">
         ${imgs.map(img => `<div class="form-row edit-img-row"><input type="text" class="edit-img-url" value="${esc(img)}" style="flex:1;" /><button class="btn-sm btn-red" onclick="this.parentElement.remove()">✕</button></div>`).join('')}
       </div>
       <div class="form-row">
         <button class="btn-sm" onclick="addEditImageRow()">＋ 新增圖片</button>
+        <button class="btn-sm" onclick="searchImages('editWord','editImageSearchResults','editNewImgUrl')">🔍 搜圖</button>
         <label class="btn-upload">📷 上傳<input type="file" accept="image/*" onchange="handleEditImageUpload(event)" hidden /></label>
       </div>
+      <div id="editImageSearchResults" class="image-search-results" hidden></div>
+      <input type="hidden" id="editNewImgUrl" />
       <div id="editImagePreview" class="image-preview" style="display:flex;gap:6px;flex-wrap:wrap;">
         ${imgs.map(img => `<img src="${img}" style="max-height:60px;border-radius:6px;" onerror="this.style.display='none'" />`).join('')}
       </div>
@@ -405,10 +475,10 @@ async function editWord(id) {
   modal.hidden = false;
 }
 
-function addEditImageRow() {
+function addEditImageRow(url) {
   const c = document.getElementById('editImagesContainer');
   const d = document.createElement('div'); d.className = 'form-row edit-img-row';
-  d.innerHTML = '<input type="text" class="edit-img-url" placeholder="圖片 URL" style="flex:1;" /><button class="btn-sm btn-red" onclick="this.parentElement.remove()">✕</button>';
+  d.innerHTML = '<input type="text" class="edit-img-url" placeholder="圖片 URL" style="flex:1;" value="' + (url ? esc(url) : '') + '" /><button class="btn-sm btn-red" onclick="this.parentElement.remove()">✕</button>';
   c.appendChild(d);
 }
 

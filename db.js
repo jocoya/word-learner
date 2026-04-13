@@ -10,6 +10,7 @@ firebase.initializeApp({
 
 var firestore = firebase.firestore();
 var auth = firebase.auth();
+var storage = firebase.storage();
 
 // 啟用 Firestore 離線快取
 firestore.enablePersistence().catch(function(err) {
@@ -24,6 +25,55 @@ auth.signInAnonymously().then(function(cred) {
 }).catch(function(err) {
   console.warn('Auth failed, using local only:', err);
 });
+
+// ===== Firebase Storage 圖片上傳 =====
+async function uploadPixabayImage(pixabayUrl, word) {
+  try {
+    // 方法1：直接 fetch（可能被 CORS 擋）
+    var response = await fetch(pixabayUrl, { mode: 'cors' });
+    if (!response.ok) throw new Error('Fetch failed');
+    var blob = await response.blob();
+
+    var filename = word.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now() + '.jpg';
+    var ref = storage.ref('word_images/' + filename);
+    var snapshot = await ref.put(blob, { contentType: blob.type || 'image/jpeg' });
+    var downloadUrl = await snapshot.ref.getDownloadURL();
+    console.log('Uploaded to Firebase Storage:', downloadUrl);
+    return downloadUrl;
+  } catch (e) {
+    console.warn('Direct fetch failed, trying canvas method:', e.message);
+    // 方法2：用 canvas 繞過 CORS
+    try {
+      return await uploadViaCanvas(pixabayUrl, word);
+    } catch (e2) {
+      console.warn('Canvas method also failed:', e2.message);
+      return pixabayUrl;
+    }
+  }
+}
+
+function uploadViaCanvas(url, word) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      canvas.toBlob(function(blob) {
+        if (!blob) { reject(new Error('toBlob failed')); return; }
+        var filename = word.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now() + '.jpg';
+        var ref = storage.ref('word_images/' + filename);
+        ref.put(blob, { contentType: 'image/jpeg' }).then(function(snapshot) {
+          return snapshot.ref.getDownloadURL();
+        }).then(resolve).catch(reject);
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = function() { reject(new Error('Image load failed')); };
+    img.src = url;
+  });
+}
 
 // ===== IndexedDB（離線快取，保持相容）=====
 var DB_NAME = 'WordLearnerDB';

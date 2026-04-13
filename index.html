@@ -90,12 +90,15 @@
         </div>
         <div class="form-row">
           <input id="newSentence1" type="text" placeholder="例句 1" />
+          <button class="btn-upload" type="button" onclick="aiGenerateSentence('newWord','newSentence1')">🤖 生成</button>
         </div>
         <div class="form-row">
           <input id="newSentence2" type="text" placeholder="例句 2（選填）" />
+          <button class="btn-upload" type="button" onclick="aiGenerateSentence('newWord','newSentence2')">🤖 生成</button>
         </div>
         <div class="form-row">
           <input id="newSentence3" type="text" placeholder="例句 3（選填）" />
+          <button class="btn-upload" type="button" onclick="aiGenerateSentence('newWord','newSentence3')">🤖 生成</button>
         </div>
         <div class="form-row">
           <input id="newImageUrl1" type="text" placeholder="圖片 1 URL（選填）" />
@@ -321,6 +324,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="db.js"></script>
   <script src="games/memory.js"></script>
   <script src="games/listen.js"></script>
