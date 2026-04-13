@@ -86,6 +86,7 @@ function initSpeakGame(area, words) {
 
       recognition.onend = () => {
         micBtn.classList.remove('recording');
+        recognition = null;
       };
 
       recognition.start();

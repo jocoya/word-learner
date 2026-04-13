@@ -121,7 +121,7 @@ function initDetectiveGame(area, words) {
         btn.textContent = '🎙️ 講出答案'; btn.classList.remove('recording'); recognition = null;
         document.getElementById('detFeedback').textContent = '聽不清楚，再試一次？';
       };
-      recognition.onend = function() { btn.textContent = '🎙️ 講出答案'; btn.classList.remove('recording'); };
+      recognition.onend = function() { btn.textContent = '🎙️ 講出答案'; btn.classList.remove('recording'); recognition = null; };
       recognition.start();
     };
 

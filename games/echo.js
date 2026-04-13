@@ -204,6 +204,7 @@ function initEchoGame(area, words) {
       recognition.onend = function() {
         mic.textContent = '🎙️ 跟我唸';
         mic.classList.remove('recording');
+        recognition = null;
       };
       recognition.start();
     });

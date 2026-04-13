@@ -389,8 +389,9 @@ body {
 }
 
 .calendar-section {
-  background: #fff; border-radius: 14px; padding: 16px;
+  background: #fff; border-radius: 14px; padding: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,.06); margin-bottom: 16px;
+  max-width: 360px;
 }
 .calendar-grid {
   display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center;
@@ -422,12 +423,13 @@ body {
 .image-search-item {
   border-radius: 10px; overflow: hidden; cursor: pointer;
   border: 3px solid transparent; transition: border-color .2s;
-  aspect-ratio: 1; position: relative;
+  position: relative; background: #f8f8f8; padding: 4px;
+  min-height: 80px;
 }
 .image-search-item:hover { border-color: #667eea; }
 .image-search-item.selected { border-color: #4CAF50; }
 .image-search-item img {
-  width: 100%; height: 100%; object-fit: cover;
+  width: 100%; height: 100%; object-fit: contain;
 }
 .image-search-loading {
   grid-column: 1 / -1; text-align: center; padding: 20px; color: #999;
@@ -992,8 +994,8 @@ body {
   .chest-reward-text { font-size: 1.8em; }
 
   /* 日曆 */
-  .calendar-grid { gap: 6px; }
-  .calendar-day { font-size: 1em; }
+  .calendar-grid { gap: 4px; }
+  .calendar-day { font-size: .85em; }
 
   /* 聽音選圖 */
   .listen-img-options { gap: 14px; }
