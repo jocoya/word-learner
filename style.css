@@ -1122,3 +1122,18 @@ body {
   .det-blanks { font-size: 4.5em; letter-spacing: 16px; }
   .det-right .det-cards { max-width: 500px; }
 }
+
+/* 標籤選擇 */
+.tag-chips {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; min-height: 24px;
+}
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #667eea; color: #fff; border-radius: 8px;
+  padding: 4px 10px; font-size: .85em;
+}
+.tag-chip-x {
+  background: none; border: none; color: #fff; cursor: pointer;
+  font-size: 1em; padding: 0 2px; opacity: .8;
+}
+.tag-chip-x:hover { opacity: 1; }

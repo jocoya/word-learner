@@ -86,8 +86,12 @@
           <button class="btn-upload" type="button" onclick="aiGenerateDefinition('newWord','newDefinition')">🤖 AI生成</button>
         </div>
         <div class="form-row">
-          <input id="newTags" type="text" placeholder="標籤（逗號分隔，如 animal, pet）" />
+          <select id="tagDropdown" onchange="addTagFromDropdown('tagDropdown','newTags','newTagChips')"><option value="">選擇標籤...</option></select>
+          <input id="newTagManual" type="text" placeholder="或輸入新標籤" style="flex:1;" />
+          <button class="btn-upload" type="button" onclick="addManualTag('newTagManual','newTags','newTagChips')">＋</button>
         </div>
+        <input type="hidden" id="newTags" />
+        <div class="tag-chips" id="newTagChips"></div>
         <div class="form-row">
           <input id="newSentence1" type="text" placeholder="例句 1" />
           <button class="btn-upload" type="button" onclick="aiGenerateSentence('newWord','newSentence1')">🤖 生成</button>

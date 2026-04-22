@@ -10,7 +10,7 @@ let dailyRole = null;
 function goTo(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
-  if (pageId === 'page-manage') renderWordList();
+  if (pageId === 'page-manage') { renderWordList(); loadTagDropdown('tagDropdown'); }
   if (pageId === 'page-exams') renderExamList();
   if (pageId === 'page-coins') renderCoinPage();
   if (pageId === 'page-games') {
@@ -215,18 +215,23 @@ async function aiGenerateSentence(wordInputId, sentenceInputId) {
     avoidText = '\n\nDo NOT use these sentences (already used):\n- ' + existing.join('\n- ') + '\n\nWrite a DIFFERENT sentence:';
   }
 
-  // 隨機選一個難度等級（4歲到10歲）
+  // 隨機選一個難度等級（4歲到8歲）
   var levels = [
-    { age: 4, desc: 'a 4-year-old (very simple, 5-6 words, about toys, food, animals)', ex: 'I like my red ball.' },
-    { age: 6, desc: 'a 6-year-old (simple, 6-8 words, about school, friends, playing)', ex: 'We play together in the park after school.' },
-    { age: 8, desc: 'an 8-year-old (natural, 8-10 words, about daily life, hobbies)', ex: 'My sister always reads a book before bedtime.' },
-    { age: 10, desc: 'a 10-year-old (slightly advanced, 8-12 words, about experiences, feelings)', ex: 'The whole class was excited about the field trip.' }
+    { age: 4, ex: 'I like the red ball.' },
+    { age: 5, ex: 'The cat is sleeping on the sofa.' },
+    { age: 6, ex: 'We went to the park after school.' },
+    { age: 7, ex: 'My sister always reads a book before bed.' },
+    { age: 8, ex: 'The dog was so happy when we came home.' }
   ];
   var level = levels[Math.floor(Math.random() * levels.length)];
 
+  // 取得詞性（如果有填的話）
+  var posEl = document.getElementById('newPos') || document.getElementById('editPos');
+  var posHint = posEl && posEl.value ? ' (used as ' + posEl.value + ')' : '';
+
   try {
     var text = await ollamaGenerate(
-      "Write one English sentence using the word '" + word + "' for " + level.desc + ". Return ONLY the sentence." + avoidText + "\n\nExample for age " + level.age + ": " + level.ex + "\nWord: " + word + "\nSentence:"
+      "You are a children's picture book author. Write one English sentence using the word '" + word + "'" + posHint + " for a " + level.age + "-year-old child.\n\nIMPORTANT RULES:\n- The sentence must describe something that REALLY happens in the real world\n- Animals can only do what real animals do (eat, sleep, run, fly)\n- Objects can only be described by their real properties (color, size, location)\n- Do NOT make animals talk, go to school, or have human friends\n- Do NOT write fantasy or fairy tale sentences\n- Keep it under 10 words\n- Return ONLY the sentence\n\nGood examples:\n- chicken: I had chicken and rice for lunch.\n- dog: The dog is playing in the yard.\n- fast: She can run very fast.\n- beautiful: The flowers in the garden are beautiful.\n\nBad examples (NEVER write like this):\n- The chicken played with his best friend. (WRONG: chickens don't have friends)\n- The fast went to the store. (WRONG: grammatically incorrect)" + avoidText + "\n\nWord: " + word + "\nSentence:"
     );
     text = text.replace(/^["'\s]+|["'\s]+$/g, '').split('\n')[0];
     senInput.value = text || '(生成失敗)';
@@ -322,6 +327,60 @@ function handleExamImageUpload(e) {
 
 function parseTags(str) {
   return str.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+}
+
+// 標籤選擇系統
+async function loadTagDropdown(dropdownId) {
+  var tags = await getAllTags();
+  var dd = document.getElementById(dropdownId);
+  if (!dd) return;
+  dd.innerHTML = '<option value="">選擇標籤...</option>';
+  tags.forEach(function(t) {
+    dd.innerHTML += '<option value="' + esc(t) + '">' + esc(t) + '</option>';
+  });
+}
+
+function addTagFromDropdown(dropdownId, hiddenId, chipsId) {
+  var dd = document.getElementById(dropdownId);
+  var tag = dd.value.trim().toLowerCase();
+  dd.value = '';
+  if (!tag) return;
+  addTagToChips(tag, hiddenId, chipsId);
+}
+
+function addManualTag(inputId, hiddenId, chipsId) {
+  var input = document.getElementById(inputId);
+  var tag = input.value.trim().toLowerCase();
+  input.value = '';
+  if (!tag) return;
+  addTagToChips(tag, hiddenId, chipsId);
+}
+
+function addTagToChips(tag, hiddenId, chipsId) {
+  var hidden = document.getElementById(hiddenId);
+  var current = parseTags(hidden.value);
+  if (current.indexOf(tag) !== -1) return; // 已存在
+  current.push(tag);
+  hidden.value = current.join(', ');
+  renderTagChips(hiddenId, chipsId);
+}
+
+function removeTagChip(tag, hiddenId, chipsId) {
+  var hidden = document.getElementById(hiddenId);
+  var current = parseTags(hidden.value);
+  current = current.filter(function(t) { return t !== tag; });
+  hidden.value = current.join(', ');
+  renderTagChips(hiddenId, chipsId);
+}
+
+function renderTagChips(hiddenId, chipsId) {
+  var hidden = document.getElementById(hiddenId);
+  var chips = document.getElementById(chipsId);
+  if (!chips) return;
+  var current = parseTags(hidden.value);
+  chips.innerHTML = current.map(function(t) {
+    return '<span class="tag-chip">' + esc(t) + '<button class="tag-chip-x" onclick="removeTagChip(\'' + esc(t) + '\',\'' + hiddenId + '\',\'' + chipsId + '\')">✕</button></span>';
+  }).join('');
 }
 
 async function addWord() {
@@ -448,8 +507,12 @@ async function editWord(id) {
         <button class="btn-upload" type="button" onclick="aiGenerateDefinition('editWord','editDefinition')">🤖 AI生成</button>
       </div>
       <div class="form-row">
-        <input id="editTags" type="text" placeholder="標籤（逗號分隔）" value="${esc(tags)}" />
+        <select id="editTagDropdown" onchange="addTagFromDropdown('editTagDropdown','editTags','editTagChips')"><option value="">選擇標籤...</option></select>
+        <input id="editTagManual" type="text" placeholder="新標籤" style="flex:1;" />
+        <button class="btn-upload" type="button" onclick="addManualTag('editTagManual','editTags','editTagChips')">＋</button>
       </div>
+      <input type="hidden" id="editTags" value="${esc(tags)}" />
+      <div class="tag-chips" id="editTagChips"></div>
       <div class="form-row"><input id="editSentence1" type="text" placeholder="例句 1" value="${esc(sentences[0]||'')}" /><button class="btn-upload" type="button" onclick="aiGenerateSentence('editWord','editSentence1')">🤖</button></div>
       <div class="form-row"><input id="editSentence2" type="text" placeholder="例句 2" value="${esc(sentences[1]||'')}" /><button class="btn-upload" type="button" onclick="aiGenerateSentence('editWord','editSentence2')">🤖</button></div>
       <div class="form-row"><input id="editSentence3" type="text" placeholder="例句 3" value="${esc(sentences[2]||'')}" /><button class="btn-upload" type="button" onclick="aiGenerateSentence('editWord','editSentence3')">🤖</button></div>
@@ -473,6 +536,8 @@ async function editWord(id) {
       </div>
     </div>`;
   modal.hidden = false;
+  loadTagDropdown('editTagDropdown');
+  renderTagChips('editTags', 'editTagChips');
 }
 
 function addEditImageRow(url) {
