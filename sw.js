@@ -1,10 +1,11 @@
-const CACHE = 'word-learner-v7';
+const CACHE = 'word-learner-v8';
 const ASSETS = [
   './index.html',
   './style.css',
   './app.js',
   './db.js',
   './coins.js',
+  './patches.js',
   './games/memory.js',
   './games/listen.js',
   './games/fillblank.js',

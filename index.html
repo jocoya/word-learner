@@ -46,8 +46,11 @@
     <div class="game-source-select">
       <label>單字來源：</label>
       <select id="gameSource" onchange="updateGameSource()">
-        <option value="permanent">永久單字庫</option>
+        <option value="permanent">全部單字</option>
         <option value="due">今日複習</option>
+      </select>
+      <select id="gameTagFilter" onchange="updateGameSource()">
+        <option value="all">所有標籤</option>
       </select>
     </div>
     <div class="game-cards" id="gameCards"></div>
@@ -341,6 +344,7 @@
   <script src="games/detective.js"></script>
   <script src="app.js"></script>
   <script src="coins.js"></script>
+  <script src="patches.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');

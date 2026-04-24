@@ -1,6 +1,10 @@
 // 句子排列遊戲（原圖片填空，改為拖拉排列單字卡片）
 function initFillBlankGame(area, words) {
-  const withSentence = words.filter(w => w.sentences && w.sentences.length > 0);
+  // 只選有短例句的單字（8個字以內）
+  const withSentence = words.filter(w => {
+    if (!w.sentences || w.sentences.length === 0) return false;
+    return w.sentences.some(s => s.split(/\s+/).length <= 8);
+  });
   if (withSentence.length < 4) {
     area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有例句的單字才能玩排列遊戲！</p>';
     return;
@@ -16,7 +20,10 @@ function initFillBlankGame(area, words) {
       return;
     }
     const target = queue[current];
-    const sentence = getRandomSentence(target);
+    // 只選短例句（8個字以內）
+    const shortSentences = (target.sentences || []).filter(s => s.split(/\s+/).length <= 8);
+    const sentence = shortSentences.length > 0 ? shortSentences[Math.floor(Math.random() * shortSentences.length)] : null;
+    if (!sentence) { current++; renderQuestion(); return; }
     const img = getRandomImage(target);
     // 把句子拆成單字卡片
     const correctWords = sentence.replace(/[.!?,;:'"]/g, '').split(/\s+/).filter(Boolean);

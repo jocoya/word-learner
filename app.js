@@ -182,9 +182,11 @@ async function aiGenerateDefinition(wordInputId, defInputId) {
   if (!word) return alert('請先輸入英文單字');
   var defInput = document.getElementById(defInputId);
   defInput.value = '生成中...';
+  var mEl = document.getElementById('newMeaning') || document.getElementById('editMeaning');
+  var mHint = mEl && mEl.value ? ' (Chinese meaning: ' + mEl.value.trim() + ')' : '';
   try {
     var text = await ollamaGenerate(
-      "Explain the English word '" + word + "' in the simplest way possible. Use very basic words that even a 4-year-old can understand. One short sentence only. Return ONLY the sentence.\n\nWord: cat\nExplanation: A small furry animal that says meow.\nWord: happy\nExplanation: When you smile because you feel good.\nWord: " + word + "\nExplanation:"
+      "Explain the English word '" + word + "'" + mHint + " in the simplest way possible. Use very basic words that even a 4-year-old can understand. One short sentence only. Return ONLY the sentence.\n\nWord: glasses (眼鏡)\nExplanation: Something you wear on your face to help you see better.\nWord: glasses (玻璃杯)\nExplanation: A cup made of glass that you drink water from.\nWord: cat\nExplanation: A small furry animal that says meow.\nWord: " + word + mHint + "\nExplanation:"
     );
     // 清理多餘的換行和引號
     text = text.replace(/^["'\s]+|["'\s]+$/g, '').split('\n')[0];
@@ -225,13 +227,15 @@ async function aiGenerateSentence(wordInputId, sentenceInputId) {
   ];
   var level = levels[Math.floor(Math.random() * levels.length)];
 
-  // 取得詞性（如果有填的話）
+  // 取得詞性和中文意思
   var posEl = document.getElementById('newPos') || document.getElementById('editPos');
   var posHint = posEl && posEl.value ? ' (used as ' + posEl.value + ')' : '';
+  var meaningEl = document.getElementById('newMeaning') || document.getElementById('editMeaning');
+  var meaningHint = meaningEl && meaningEl.value ? ' (meaning: ' + meaningEl.value.trim() + ')' : '';
 
   try {
     var text = await ollamaGenerate(
-      "You are a children's picture book author. Write one English sentence using the word '" + word + "'" + posHint + " for a " + level.age + "-year-old child.\n\nIMPORTANT RULES:\n- The sentence must describe something that REALLY happens in the real world\n- Animals can only do what real animals do (eat, sleep, run, fly)\n- Objects can only be described by their real properties (color, size, location)\n- Do NOT make animals talk, go to school, or have human friends\n- Do NOT write fantasy or fairy tale sentences\n- Keep it under 10 words\n- Return ONLY the sentence\n\nGood examples:\n- chicken: I had chicken and rice for lunch.\n- dog: The dog is playing in the yard.\n- fast: She can run very fast.\n- beautiful: The flowers in the garden are beautiful.\n\nBad examples (NEVER write like this):\n- The chicken played with his best friend. (WRONG: chickens don't have friends)\n- The fast went to the store. (WRONG: grammatically incorrect)" + avoidText + "\n\nWord: " + word + "\nSentence:"
+      "You are a children's picture book author. Write one English sentence using the word '" + word + "'" + posHint + meaningHint + " for a " + level.age + "-year-old child.\n\nIMPORTANT RULES:\n- The sentence must describe something that REALLY happens in the real world\n- Animals can only do what real animals do (eat, sleep, run, fly)\n- Objects can only be described by their real properties (color, size, location)\n- Do NOT make animals talk, go to school, or have human friends\n- Do NOT write fantasy or fairy tale sentences\n- Keep it under 10 words\n- Return ONLY the sentence\n\nGood examples:\n- chicken: I had chicken and rice for lunch.\n- dog: The dog is playing in the yard.\n- fast: She can run very fast.\n- beautiful: The flowers in the garden are beautiful.\n\nBad examples (NEVER write like this):\n- The chicken played with his best friend. (WRONG: chickens don't have friends)\n- The fast went to the store. (WRONG: grammatically incorrect)" + avoidText + "\n\nWord: " + word + "\nSentence:"
     );
     text = text.replace(/^["'\s]+|["'\s]+$/g, '').split('\n')[0];
     senInput.value = text || '(生成失敗)';
