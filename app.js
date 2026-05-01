@@ -135,20 +135,26 @@ async function awardDailyCoin(role) {
   const coins = await getCoins();
   if (role === 'boy') coins.boy += 1; else coins.girl += 1;
   coins.log.push({ role, count: 1, date: getTodayStr() });
+  // 追蹤今日挑戰次數
+  var today = getTodayStr();
+  var dayKey = 'dailyPlays-' + today;
+  coins[dayKey] = (coins[dayKey] || 0) + 1;
   await saveCoins(coins);
-  // 同步到 Firestore 使用者進度
   updateUserProgress(role, 1, 10);
   const daily = await getDailyData();
-  const today = getTodayStr();
   const roleKey = role + '-' + today;
   if (!daily.completedDates.includes(roleKey)) {
     daily.completedDates.push(roleKey);
     const y = new Date(); y.setDate(y.getDate() - 1);
-    const yStr = `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
+    const yStr = y.getFullYear() + '-' + String(y.getMonth()+1).padStart(2,'0') + '-' + String(y.getDate()).padStart(2,'0');
     if (daily.completedDates.includes('boy-'+yStr) || daily.completedDates.includes('girl-'+yStr) || daily.streak === 0) daily.streak++;
     else if (daily.lastDate !== today) daily.streak = 1;
     daily.lastDate = today;
     await saveDailyData(daily);
+  }
+  // 每 5 次跳寶箱
+  if (coins[dayKey] % 5 === 0) {
+    setTimeout(function() { showChestModal(); }, 1500);
   }
 }
 

@@ -41,11 +41,22 @@ function initMemoryGame(area, words, mode) {
   let cards = [];
 
   if (mode === 'baby') {
-    selected.forEach((w, i) => {
+    // 只選有圖片的單字
+    const withImg = selected.filter(w => getAllImages(w).length > 0);
+    const useWords = withImg.length >= 4 ? withImg.slice(0, Math.min(6, withImg.length)) : selected.slice(0, Math.min(6, selected.length));
+    const cnt = useWords.length;
+    useWords.forEach((w, i) => {
       const img = getRandomImage(w);
-      const label = img ? `<img src="${img}" alt="${w.word}" style="max-width:90%;max-height:70%;object-fit:cover;border-radius:6px;" />` : `<div style="font-size:1.5em">${w.word}</div>`;
+      const label = img
+        ? `<img src="${img}" alt="${w.word}" style="max-width:90%;max-height:70%;object-fit:contain;border-radius:6px;" />`
+        : `<div style="font-size:2em">${esc(w.word)}</div>`;
       cards.push({ id: i, pairId: i, content: label, word: w });
-      cards.push({ id: i + count, pairId: i, content: label, word: w });
+      // 第二張用不同圖片（如果有多張的話）
+      const img2 = getRandomImage(w);
+      const label2 = img2
+        ? `<img src="${img2}" alt="${w.word}" style="max-width:90%;max-height:70%;object-fit:contain;border-radius:6px;" />`
+        : label;
+      cards.push({ id: i + cnt, pairId: i, content: label2, word: w });
     });
   } else {
     // 8歲：英文單字配圖片
