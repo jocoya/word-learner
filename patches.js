@@ -46,3 +46,46 @@ function startDailyWithRole(role) {
   updateGameSource();
   goTo('page-games');
 }
+
+// ===== 圖片預載 =====
+function preloadImages(words) {
+  words.forEach(function(w) {
+    var imgs = getAllImages(w);
+    imgs.forEach(function(url) {
+      if (url && url.indexOf('http') === 0) {
+        var img = new Image();
+        img.src = url;
+      }
+    });
+  });
+}
+
+// 覆蓋 startGame 加入預載
+var _originalStartGame = startGame;
+startGame = async function(gameId) {
+  var words = await getGameWords();
+  if (!words) return;
+  // 預載圖片
+  preloadImages(words);
+  currentGameWords = words;
+  document.getElementById('gameTitle').textContent = GAMES.find(function(g){return g.id===gameId;}).name;
+  document.getElementById('gameScore').textContent = '';
+  goTo('page-game');
+  var area = document.getElementById('gameArea');
+  area.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">載入中...</div>';
+  // 等一下讓圖片有時間載入
+  setTimeout(function() {
+    area.innerHTML = '';
+    switch (gameId) {
+      case 'memory':    initMemoryGame(area, words, currentMode); break;
+      case 'listen':    initListenGame(area, words, currentMode); break;
+      case 'fillblank': initFillBlankGame(area, words); break;
+      case 'spelling':  initSpellingGame(area, words); break;
+      case 'speak':     initSpeakGame(area, words); break;
+      case 'bubble':    initBubbleGame(area, words); break;
+      case 'echo':      initEchoGame(area, words); break;
+      case 'flashlight':initFlashlightGame(area, words); break;
+      case 'detective': initDetectiveGame(area, words); break;
+    }
+  }, 500);
+};

@@ -119,9 +119,16 @@ function showResult(correct, total) {
   document.getElementById('resultStats').textContent  = `答對 ${correct} / ${total} 題`;
   const coinArea = document.getElementById('resultCoinArea');
   if (dailyRole && pct >= 0.5) {
-    awardDailyCoin(dailyRole).then(() => {
-      const coinImg = dailyRole === 'boy' ? './images/COIN_CAT.png' : './images/COIN_DOG.png';
-      if (coinArea) coinArea.innerHTML = '<div class="coin-earn-anim"><img src="' + coinImg + '" style="width:48px;height:48px;"> +1</div>';
+    // 檢查今天是否已經拿過金幣
+    checkDailyCoinLimit(dailyRole).then(function(canEarn) {
+      if (canEarn) {
+        awardDailyCoin(dailyRole).then(function() {
+          var coinImg = dailyRole === 'boy' ? './images/COIN_CAT.png' : './images/COIN_DOG.png';
+          if (coinArea) coinArea.innerHTML = '<div class="coin-earn-anim"><img src="' + coinImg + '" style="width:48px;height:48px;"> +1</div>';
+        });
+      } else {
+        if (coinArea) coinArea.innerHTML = '<div style="color:#999;">今天已經拿過金幣了！明天再來 🎉</div>';
+      }
     });
   } else if (dailyRole && coinArea) {
     coinArea.innerHTML = '<div style="color:#999;">這次沒拿到金幣，再試一次！</div>';
@@ -131,10 +138,22 @@ function showResult(correct, total) {
   goTo('page-result');
 }
 
+async function checkDailyCoinLimit(role) {
+  var coins = await getCoins();
+  var today = getTodayStr();
+  var key = 'coinEarned-' + role + '-' + today;
+  return !coins[key];
+}
+
 async function awardDailyCoin(role) {
   const coins = await getCoins();
+  var today = getTodayStr();
+  // 標記今天已領取
+  var earnKey = 'coinEarned-' + role + '-' + today;
+  if (coins[earnKey]) return; // 已經領過
+  coins[earnKey] = true;
   if (role === 'boy') coins.boy += 1; else coins.girl += 1;
-  coins.log.push({ role, count: 1, date: getTodayStr() });
+  coins.log.push({ role, count: 1, date: today });
   // 追蹤今日挑戰次數
   var today = getTodayStr();
   var dayKey = 'dailyPlays-' + today;
