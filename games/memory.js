@@ -41,21 +41,20 @@ function initMemoryGame(area, words, mode) {
   let cards = [];
 
   if (mode === 'baby') {
-    // 只選有圖片的單字
-    const withImg = selected.filter(w => getAllImages(w).length > 0);
-    const useWords = withImg.length >= 4 ? withImg.slice(0, Math.min(6, withImg.length)) : selected.slice(0, Math.min(6, selected.length));
+    // 只選有圖片的單字，完全不顯示文字
+    const withImg = words.filter(w => getAllImages(w).length > 0);
+    if (withImg.length < 4) {
+      area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有圖片的單字才能玩翻牌！</p>';
+      return;
+    }
+    const useWords = shuffleArray(withImg).slice(0, Math.min(6, withImg.length));
     const cnt = useWords.length;
     useWords.forEach((w, i) => {
       const img = getRandomImage(w);
-      const label = img
-        ? `<img src="${img}" alt="${w.word}" style="max-width:90%;max-height:70%;object-fit:contain;border-radius:6px;" />`
-        : `<div style="font-size:2em">${esc(w.word)}</div>`;
+      const label = `<img src="${img}" alt="" style="max-width:90%;max-height:70%;object-fit:contain;border-radius:6px;" />`;
       cards.push({ id: i, pairId: i, content: label, word: w });
-      // 第二張用不同圖片（如果有多張的話）
       const img2 = getRandomImage(w);
-      const label2 = img2
-        ? `<img src="${img2}" alt="${w.word}" style="max-width:90%;max-height:70%;object-fit:contain;border-radius:6px;" />`
-        : label;
+      const label2 = `<img src="${img2}" alt="" style="max-width:90%;max-height:70%;object-fit:contain;border-radius:6px;" />`;
       cards.push({ id: i + cnt, pairId: i, content: label2, word: w });
     });
   } else {
