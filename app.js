@@ -110,7 +110,7 @@ function exitGame() {
   goTo('page-games');
 }
 
-function showResult(correct, total) {
+async function showResult(correct, total) {
   const pct = total > 0 ? correct / total : 0;
   const stars = pct >= .9 ? '⭐⭐⭐' : pct >= .7 ? '⭐⭐' : pct >= .5 ? '⭐' : '💪';
   const msgs  = pct >= .9 ? '太厲害了！' : pct >= .7 ? '很棒喔！' : pct >= .5 ? '繼續加油！' : '再練習一下！';
@@ -136,6 +136,18 @@ function showResult(correct, total) {
     coinArea.innerHTML = '';
   }
   goTo('page-result');
+
+  // 追蹤每日遊戲完成次數，每5次跳寶箱
+  if (dailyRole) {
+    var coins = await getCoins();
+    var today = getTodayStr();
+    var dayKey = 'dailyPlays-' + today;
+    coins[dayKey] = (coins[dayKey] || 0) + 1;
+    await saveCoins(coins);
+    if (coins[dayKey] % 5 === 0) {
+      setTimeout(function() { showChestModal(); }, 1500);
+    }
+  }
 }
 
 async function checkDailyCoinLimit(role) {
@@ -154,10 +166,6 @@ async function awardDailyCoin(role) {
   coins[earnKey] = true;
   if (role === 'boy') coins.boy += 1; else coins.girl += 1;
   coins.log.push({ role, count: 1, date: today });
-  // 追蹤今日挑戰次數
-  var today = getTodayStr();
-  var dayKey = 'dailyPlays-' + today;
-  coins[dayKey] = (coins[dayKey] || 0) + 1;
   await saveCoins(coins);
   updateUserProgress(role, 1, 10);
   const daily = await getDailyData();
@@ -170,10 +178,6 @@ async function awardDailyCoin(role) {
     else if (daily.lastDate !== today) daily.streak = 1;
     daily.lastDate = today;
     await saveDailyData(daily);
-  }
-  // 每 5 次跳寶箱
-  if (coins[dayKey] % 5 === 0) {
-    setTimeout(function() { showChestModal(); }, 1500);
   }
 }
 
