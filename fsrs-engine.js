@@ -219,3 +219,62 @@ function recommendGameByStability(stability) {
   if (stability < 20) return ['spelling', 'detective'];
   return ['fillblank'];
 }
+
+// ===== 遊戲難度門檻系統（鷹架理論）=====
+// 每個遊戲對應一個最低 stability 要求
+var GAME_MIN_STABILITY = {
+  memory: 0,      // 翻牌配對 - 認知最低
+  listen: 0,      // 看字選圖 - 認字配對
+  flashlight: 0,  // 探照燈尋寶 - 探索式
+  bubble: 1,      // 泡泡戳戳樂 - 需要快速反應
+  echo: 1,        // 魔法發音動物園 - 跟讀
+  spelling: 4,    // 拼字挑戰 - 需要會拼
+  speak: 4,       // 看圖說句 - 需要會用
+  fillblank: 10,  // 句子排列 - 需要情境理解
+  detective: 10   // 線索偵探 - 需要推敲
+};
+
+// 遊戲名稱對應（給友善提示用）
+var GAME_NAMES_ZH = {
+  memory: '翻牌配對',
+  listen: '看字選圖',
+  flashlight: '探照燈尋寶',
+  bubble: '泡泡戳戳樂',
+  echo: '魔法發音動物園',
+  spelling: '拼字挑戰',
+  speak: '看圖說句',
+  fillblank: '句子排列',
+  detective: '線索偵探'
+};
+
+// 取得單字的當前 stability（沒有 progress 紀錄就回 0）
+async function getWordStability(wordId) {
+  var p = await dbGet('progress', wordId);
+  if (!p) return 0;
+  p = fsrsUpgrade(p);
+  return p.stability || 0;
+}
+
+// 篩選符合該遊戲難度門檻的單字
+async function filterWordsForGame(words, gameType) {
+  var minS = GAME_MIN_STABILITY[gameType];
+  if (minS == null || minS === 0) return words; // 不需要篩選
+  var result = [];
+  for (var i = 0; i < words.length; i++) {
+    var s = await getWordStability(words[i].id);
+    if (s >= minS) result.push(words[i]);
+  }
+  return result;
+}
+
+// 給玩家友善的「該玩什麼遊戲」提示
+function getEasierGamesHint(gameType) {
+  var minS = GAME_MIN_STABILITY[gameType];
+  if (minS == null) return '';
+  var easier = [];
+  for (var key in GAME_MIN_STABILITY) {
+    if (GAME_MIN_STABILITY[key] < minS) easier.push(GAME_NAMES_ZH[key]);
+  }
+  if (easier.length === 0) return '';
+  return '這個遊戲需要你比較熟的單字喔！\n\n建議先去玩：' + easier.slice(0, 3).join('、');
+}

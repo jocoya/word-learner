@@ -1170,3 +1170,62 @@ body {
 }
 .stage-up-icon { font-size: 3em; }
 .stage-up-text { font-size: 1.5em; font-weight: 700; margin-top: 8px; }
+
+
+/* ===== 考試包多選列 ===== */
+.exam-multi-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; margin-bottom: 8px;
+  background: #fff8e1; border-radius: 12px;
+  border: 2px dashed #FFC107;
+}
+.exam-multi-toggle { display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
+.exam-multi-toggle input { width: 18px; height: 18px; }
+.exam-pick { width: 22px; height: 22px; margin-right: 8px; cursor: pointer; flex-shrink: 0; }
+.exam-item { display: flex; align-items: center; }
+
+/* ===== 每日挑戰區段轉場 ===== */
+.segment-banner {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.segment-banner.show { opacity: 1; }
+.segment-banner-inner {
+  background: linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%);
+  color: #fff;
+  font-size: 1.6em;
+  font-weight: 700;
+  padding: 24px 36px;
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+  text-align: center;
+  text-shadow: 1px 2px 4px rgba(0,0,0,0.25);
+  transform: scale(0.85);
+  transition: transform 0.3s ease;
+}
+.segment-banner.show .segment-banner-inner { transform: scale(1); }
+
+/* ===== 每日挑戰程度選單 ===== */
+.daily-level-row {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 16px auto;
+  max-width: 420px; width: 90%;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.92);
+  border-radius: 14px;
+}
+.daily-level-label { font-weight: 700; color: #555; font-size: 0.95em; }
+.daily-level-row select {
+  padding: 10px 12px;
+  font-size: 1em;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+.daily-level-row select:focus { border-color: #4A90D9; outline: none; }

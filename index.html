@@ -294,6 +294,21 @@
           <div class="profile-name">小女生</div>
         </button>
       </div>
+      <div class="daily-level-row">
+        <label class="daily-level-label">程度</label>
+        <select id="dailyLevelBoy" onchange="saveDailyLevel('boy', this.value)">
+          <option value="auto">👦 自動（依平均熟悉度）</option>
+          <option value="beginner">👦 萌新（聽選圖+翻牌+泡泡）</option>
+          <option value="intermediate">👦 中級（加句子排列）</option>
+          <option value="advanced">👦 高級（加拼字）</option>
+        </select>
+        <select id="dailyLevelGirl" onchange="saveDailyLevel('girl', this.value)">
+          <option value="auto">👧 自動（依平均熟悉度）</option>
+          <option value="beginner">👧 萌新</option>
+          <option value="intermediate">👧 中級</option>
+          <option value="advanced">👧 高級</option>
+        </select>
+      </div>
       <button class="btn-manage" onclick="goTo('page-home')">← 返回</button>
     </div>
   </div>

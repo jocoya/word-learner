@@ -17,6 +17,7 @@ function goTo(pageId) {
     const srcEl = document.getElementById('gameSource');
     if (srcEl) srcEl.parentElement.style.display = '';
   }
+  if (pageId === 'page-daily-pick' && typeof loadDailyLevels === 'function') loadDailyLevels();
 }
 
 function enterMode(mode) {
@@ -652,12 +653,58 @@ async function renderExamList() {
   const exams = await dbGetAll('exams');
   const counts = {}; const allWords = await dbGetAll('words');
   allWords.forEach(w => { if (w.pool && w.pool.startsWith('exam-')) { const eid = parseInt(w.pool.replace('exam-','')); counts[eid] = (counts[eid]||0)+1; } });
-  document.getElementById('examList').innerHTML = exams.map(ex => `
-    <div class="exam-item" onclick="openExam(${ex.id})">
-      <div class="exam-item-icon">📝</div>
-      <div class="exam-item-info"><div class="exam-item-name">${esc(ex.name)}</div><div class="exam-item-meta">${counts[ex.id]||0} 個單字${ex.examDate?' · 考試日 '+ex.examDate:''}</div></div>
+  document.getElementById('examList').innerHTML = (exams.length === 0 ? '' : `
+    <div class="exam-multi-bar">
+      <label class="exam-multi-toggle"><input type="checkbox" id="examSelectAll" onchange="toggleAllExams(this.checked)" /> 全選</label>
+      <button class="btn-sm btn-green" onclick="startMultiExamPractice()">▶ 練習已勾選</button>
+      <span id="examMultiCount" style="color:#666;font-size:.85em;"></span>
+    </div>
+  `) + exams.map(ex => `
+    <div class="exam-item">
+      <input type="checkbox" class="exam-pick" data-eid="${ex.id}" onchange="updateExamMultiCount()" onclick="event.stopPropagation();" />
+      <div class="exam-item-icon" onclick="openExam(${ex.id})">📝</div>
+      <div class="exam-item-info" onclick="openExam(${ex.id})"><div class="exam-item-name">${esc(ex.name)}</div><div class="exam-item-meta">${counts[ex.id]||0} 個單字${ex.examDate?' · 考試日 '+ex.examDate:''}</div></div>
       <button class="btn-sm btn-red" onclick="event.stopPropagation();deleteExam(${ex.id})">🗑️</button>
     </div>`).join('') || '<p style="color:#999;text-align:center;padding:20px;">還沒有考試包</p>';
+  updateExamMultiCount();
+}
+
+function toggleAllExams(checked) {
+  document.querySelectorAll('.exam-pick').forEach(function(cb) { cb.checked = checked; });
+  updateExamMultiCount();
+}
+
+function updateExamMultiCount() {
+  var checked = document.querySelectorAll('.exam-pick:checked').length;
+  var label = document.getElementById('examMultiCount');
+  if (label) label.textContent = checked > 0 ? '已勾選 ' + checked + ' 個' : '';
+}
+
+async function startMultiExamPractice() {
+  var picks = Array.from(document.querySelectorAll('.exam-pick:checked')).map(function(cb) { return parseInt(cb.dataset.eid); });
+  if (picks.length === 0) { alert('請先勾選至少一個考試包'); return; }
+  var allWords = [];
+  for (var i = 0; i < picks.length; i++) {
+    var ws = await dbGetByIndex('words', 'pool', 'exam-' + picks[i]);
+    allWords = allWords.concat(ws);
+  }
+  // 去重（依 wordId）
+  var seen = {};
+  allWords = allWords.filter(function(w) { if (seen[w.id]) return false; seen[w.id] = true; return true; });
+  if (allWords.length < 4) { alert('勾選的考試包單字總數不夠，至少需要 4 個！'); return; }
+  currentGameWords = shuffleArray(allWords);
+  currentMode = 'kid';
+  renderGameCards();
+  goTo('page-games');
+  var srcEl = document.getElementById('gameSource');
+  // 移除舊的多選選項，避免重複
+  Array.from(srcEl.options).forEach(function(opt) {
+    if (opt.value === 'exam-multi' || (opt.value.indexOf('exam-') === 0 && opt.value !== 'exam-multi')) srcEl.removeChild(opt);
+  });
+  var opt = document.createElement('option');
+  opt.value = 'exam-multi'; opt.textContent = '已勾選的 ' + picks.length + ' 個考試包'; opt.selected = true;
+  srcEl.appendChild(opt);
+  document.getElementById('gamesTitle').textContent = '📝 考試複習 — 選一個遊戲';
 }
 async function openExam(id) {
   currentExamId = id;
@@ -717,10 +764,114 @@ async function deleteExam(id) {
   await dbDelete('exams',id); renderExamList();
 }
 async function graduateExam() {
-  if (!confirm('將此考試包的所有單字移到永久單字庫？')) return;
-  const words = await dbGetByIndex('words','pool','exam-'+currentExamId);
-  for (const w of words) { w.pool='permanent'; await dbPut('words',w); }
-  alert(`已將 ${words.length} 個單字移到永久庫！`); renderExamWordList();
+  if (!confirm('將此考試包的所有單字移到永久單字庫？\n（如果永久庫已有同名單字，將跳出對話框讓你選擇是否合併）')) return;
+  const examWords = await dbGetByIndex('words','pool','exam-'+currentExamId);
+  const permWords = await dbGetByIndex('words','pool','permanent');
+  // 建立永久庫單字字串對照表（小寫）
+  const permMap = {};
+  permWords.forEach(function(w) { permMap[w.word.trim().toLowerCase()] = w; });
+
+  let moved = 0, merged = 0, skipped = 0;
+  for (const w of examWords) {
+    const key = w.word.trim().toLowerCase();
+    const dup = permMap[key];
+    if (dup && dup.id !== w.id) {
+      // 永久庫已有同名單字
+      const choice = await askMergeChoice(w, dup);
+      if (choice === 'merge') {
+        await mergeWordIntoPermanent(w, dup);
+        merged++;
+      } else if (choice === 'skip') {
+        skipped++;
+      } else if (choice === 'keep') {
+        // 仍然移過去，當作獨立單字
+        w.pool = 'permanent';
+        await dbPut('words', w);
+        moved++;
+      }
+    } else {
+      // 沒有重複，直接畢業
+      w.pool = 'permanent';
+      await dbPut('words', w);
+      moved++;
+    }
+  }
+  alert('畢業完成！\n  ✓ 新進永久庫：' + moved + ' 個\n  ⊕ 合併進度：' + merged + ' 個\n  ⊘ 跳過：' + skipped + ' 個');
+  renderExamWordList();
+}
+
+// 跳對話框問玩家：合併 / 跳過 / 仍當獨立單字保留
+function askMergeChoice(examWord, permWord) {
+  return new Promise(function(resolve) {
+    const modal = document.getElementById('modal-edit');
+    modal.innerHTML = '<div class="modal-content" style="max-width:420px;">' +
+      '<h3>單字重複</h3>' +
+      '<p>永久庫已經有 <strong>「' + esc(permWord.word) + '」</strong>。</p>' +
+      '<p style="color:#666;font-size:.9em;">考試包：' + esc(examWord.meaning) + '<br>永久庫：' + esc(permWord.meaning) + '</p>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">' +
+      '<button class="btn-primary" id="mc-merge">⊕ 合併進度（推薦）</button>' +
+      '<button class="btn-ghost" id="mc-keep">＋ 當作獨立單字保留兩筆</button>' +
+      '<button class="btn-ghost" id="mc-skip">⊘ 跳過這個單字（留在考試包）</button>' +
+      '</div></div>';
+    modal.hidden = false;
+    document.getElementById('mc-merge').onclick = function() { modal.hidden = true; resolve('merge'); };
+    document.getElementById('mc-keep').onclick = function() { modal.hidden = true; resolve('keep'); };
+    document.getElementById('mc-skip').onclick = function() { modal.hidden = true; resolve('skip'); };
+  });
+}
+
+// 合併考試包單字進永久庫的同名單字
+// - 取兩筆 progress 的 stability 較高者
+// - 合併 unlockedStages
+// - 合併圖片、例句（去重）
+// - 刪除考試包那筆 + 它的 progress
+async function mergeWordIntoPermanent(examWord, permWord) {
+  // 合併內容到永久庫單字
+  const mergedImages = (function() {
+    const all = (permWord.images || []).concat(examWord.images || []);
+    if (permWord.imageUrl) all.push(permWord.imageUrl);
+    if (examWord.imageUrl) all.push(examWord.imageUrl);
+    return Array.from(new Set(all.filter(Boolean)));
+  })();
+  const mergedSentences = Array.from(new Set(((permWord.sentences || []).concat(examWord.sentences || [])).filter(Boolean)));
+  const mergedTags = Array.from(new Set(((permWord.tags || []).concat(examWord.tags || [])).map(function(t) { return t.trim().toLowerCase(); }).filter(Boolean)));
+  permWord.images = mergedImages;
+  permWord.sentences = mergedSentences;
+  permWord.tags = mergedTags;
+  permWord.imageUrl = null;
+  permWord.imageLocal = null;
+  if (!permWord.pos && examWord.pos) permWord.pos = examWord.pos;
+  if (!permWord.antonym && examWord.antonym) permWord.antonym = examWord.antonym;
+  if (!permWord.definition && examWord.definition) permWord.definition = examWord.definition;
+  await dbPut('words', permWord);
+
+  // 合併 progress：取 stability 較高者
+  const examP = await dbGet('progress', examWord.id);
+  const permP = await dbGet('progress', permWord.id);
+  if (examP) {
+    const eUp = (typeof fsrsUpgrade === 'function') ? fsrsUpgrade(examP) : examP;
+    const pUp = permP ? ((typeof fsrsUpgrade === 'function') ? fsrsUpgrade(permP) : permP) : null;
+    let winner;
+    if (!pUp || (eUp.stability || 0) > (pUp.stability || 0)) {
+      // 用考試包的 progress，但 wordId 改成永久庫的 id
+      winner = Object.assign({}, eUp, { wordId: permWord.id });
+      // 合併 unlockedStages
+      const merged = (eUp.unlockedStages || []).concat(pUp ? (pUp.unlockedStages || []) : []);
+      winner.unlockedStages = Array.from(new Set(merged));
+      // 移除舊的 firestore id 避免覆蓋
+      delete winner._firestoreId;
+    } else {
+      // 留永久庫的 progress，但合併 unlockedStages
+      winner = pUp;
+      const merged = (pUp.unlockedStages || []).concat(eUp.unlockedStages || []);
+      winner.unlockedStages = Array.from(new Set(merged));
+    }
+    await dbPut('progress', winner);
+  }
+
+  // 刪除考試包那筆單字 + 對應 progress
+  await dbDelete('words', examWord.id);
+  if (examP) await dbDelete('progress', examWord.id);
 }
 
 // ===== 匯出匯入 =====
