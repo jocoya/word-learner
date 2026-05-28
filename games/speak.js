@@ -70,7 +70,7 @@ function initSpeakGame(area, words) {
             transcriptEl.innerHTML = `💪 "${transcript}" — 試試包含 <strong>${target.word}</strong>`;
             transcriptEl.style.background = '#fff3e0';
           }
-          updateProgress(target.id, found);
+          updateProgress(target.id, found, 'speak', { mistakes: found ? 0 : 1 });
           document.getElementById('gameScore').textContent = `${correct} / ${current + 1}`;
           micBtn.classList.remove('recording');
           recognition = null;

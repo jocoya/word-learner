@@ -88,6 +88,12 @@
           <input id="newDefinition" type="text" placeholder="英英解釋（選填）" />
           <button class="btn-upload" type="button" onclick="aiGenerateDefinition('newWord','newDefinition')">🤖 AI生成</button>
         </div>
+        <div class="form-row" style="align-items:center;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input id="newAlreadyKnown" type="checkbox" />
+            <span>✅ 我已經會這個字（直接進入大師期）</span>
+          </label>
+        </div>
         <div class="form-row">
           <select id="tagDropdown" onchange="addTagFromDropdown('tagDropdown','newTags','newTagChips')"><option value="">選擇標籤...</option></select>
           <input id="newTagManual" type="text" placeholder="或輸入新標籤" style="flex:1;" />
@@ -373,6 +379,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
   <script src="db.js"></script>
+  <script src="fsrs-engine.js"></script>
   <script src="games/memory.js"></script>
   <script src="games/listen.js"></script>
   <script src="games/fillblank.js"></script>

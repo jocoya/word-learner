@@ -104,7 +104,7 @@ function initDetectiveGame(area, words) {
         if (found) {
           answered = true; correct++;
           speakWord(target.word, 0.7);
-          updateProgress(target.id, true);
+          updateProgress(target.id, true, 'detective', { mistakes: 0 });
           document.getElementById('gameScore').textContent = correct + ' / ' + (current+1);
           // 底線變成答案
           document.getElementById('detBlanks').innerHTML = '<span class="det-answer-word">' + esc(target.word) + '</span>';
@@ -126,7 +126,7 @@ function initDetectiveGame(area, words) {
     };
 
     window.skipDetective = function() {
-      updateProgress(target.id, false);
+      updateProgress(target.id, false, 'detective', { mistakes: 2 });
       speakWord(target.word, 0.7);
       document.getElementById('detBlanks').innerHTML = '<span class="det-answer-word">' + esc(target.word) + '</span>';
       setTimeout(function() { current++; renderRound(); }, 2000);

@@ -1,9 +1,11 @@
-const CACHE = 'word-learner-v11';
+const CACHE = 'word-learner-v12';
 const ASSETS = [
   './index.html',
   './style.css',
   './app.js',
   './db.js',
+  './fsrs-engine.js',
+  './fsrs-engine.js',
   './coins.js',
   './patches.js',
   './games/memory.js',

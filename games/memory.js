@@ -122,7 +122,10 @@ function initMemoryGame(area, words, mode) {
             b.el.style.visibility = 'hidden';
           }, 500);
           matched++;
-          updateProgress(cards[a.idx].word.id, true);
+          // 計算這對的錯誤次數：總翻牌次數 - 已配對對數*2 = 失誤翻牌
+          var totalMistakes = Math.max(0, attempts - matched);
+          var avgMistakesPerPair = matched > 0 ? totalMistakes / matched : 0;
+          updateProgress(cards[a.idx].word.id, true, 'memory', { mistakes: Math.round(avgMistakesPerPair) });
           flipped = [];
           locked = false;
           updateScore();

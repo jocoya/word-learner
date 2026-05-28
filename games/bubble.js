@@ -106,7 +106,8 @@ function initBubbleGame(area, words) {
       b.popped = true;
       if (b.word.id === target.id) {
         correct++;
-        updateProgress(target.id, true);
+        var elapsed = (performance.now() - roundStart) / 1000;
+        updateProgress(target.id, true, 'bubble', { mistakes: 0, timeUsed: elapsed });
         document.getElementById('gameScore').textContent = correct + '/' + total;
         speakWord(target.word);
         confettiBurst(b.x, b.y, document.getElementById('bubbleField'));

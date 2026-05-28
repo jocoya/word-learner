@@ -61,7 +61,7 @@ function initFlashlightGame(area, words) {
       document.getElementById('flWord').classList.add('fl-word-show');
       speakWord(target.word, 0.6);
       correct++;
-      updateProgress(target.id, true);
+      updateProgress(target.id, true, 'flashlight', { mistakes: 0 });
       document.getElementById('gameScore').textContent = correct + ' / ' + (current + 1);
       setTimeout(function() { current++; renderRound(); }, 2500);
     }

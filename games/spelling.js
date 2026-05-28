@@ -86,7 +86,12 @@ function initSpellingGame(area, words) {
               s.style.color = s.textContent === filled[si]?.letter ? '#4CAF50' : '#f44336';
             });
           }
-          updateProgress(target.id, isCorrect);
+          // 計算錯誤字母數
+          var wrongCount = 0;
+          for (var li = 0; li < filled.length; li++) {
+            if (filled[li] && blankLetters[li] && filled[li].letter !== blankLetters[li]) wrongCount++;
+          }
+          updateProgress(target.id, isCorrect, 'spelling', { mistakes: wrongCount });
           document.getElementById('gameScore').textContent = `${correct} / ${current + 1}`;
           setTimeout(() => { current++; renderQuestion(); }, 2000);
         }

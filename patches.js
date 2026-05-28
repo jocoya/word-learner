@@ -89,3 +89,92 @@ startGame = async function(gameId) {
     }
   }, 500);
 };
+
+// ===== FSRS 整合的多巴胺系統 =====
+// 同一場挑戰的連擊計數
+var sessionEasyStreak = 0;
+var sessionDiamondsEarned = 0;
+var sessionStageUnlocks = [];
+
+function resetSession() {
+  sessionEasyStreak = 0;
+  sessionDiamondsEarned = 0;
+  sessionStageUnlocks = [];
+}
+
+// 統一的遊戲結算入口（取代原本各遊戲的 updateProgress）
+async function finishWordRound(payload) {
+  if (!payload || !payload.wordId) return;
+  var result = await recordGameResult(payload);
+
+  // 連續 3 題 Easy 且該單字今天第一次複習 → 給鑽石
+  if (result.isEasy && result.isFirstToday) {
+    sessionEasyStreak++;
+    if (sessionEasyStreak >= 3) {
+      sessionEasyStreak = 0;
+      sessionDiamondsEarned++;
+      var coins = await getCoins();
+      coins.rewards = coins.rewards || {};
+      coins.rewards['diamond'] = (coins.rewards['diamond'] || 0) + 1;
+      coins.log.push({ role: '-', count: 0, date: getTodayStr(), chest: '💎 連續 Easy 鑽石' });
+      await saveCoins(coins);
+      showFloatingReward('💎 +1', '#00bcd4');
+    }
+  } else if (!result.isEasy) {
+    sessionEasyStreak = 0;
+  }
+
+  // 階段升級 → 寶箱
+  if (result.stageUnlocked) {
+    sessionStageUnlocks.push(result.stageUnlocked);
+    showStageUpAnimation(result.stageUnlocked);
+    setTimeout(function() { showChestModal(); }, 1500);
+  }
+
+  return result;
+}
+
+function showFloatingReward(text, color) {
+  var div = document.createElement('div');
+  div.className = 'floating-reward';
+  div.style.color = color || '#FFD700';
+  div.textContent = text;
+  document.body.appendChild(div);
+  setTimeout(function() { div.remove(); }, 1800);
+}
+
+function showStageUpAnimation(stage) {
+  var stageNames = ['', '熟悉期', '應用期', '大師期'];
+  var div = document.createElement('div');
+  div.className = 'stage-up-banner';
+  div.innerHTML = '<div class="stage-up-icon">🌟</div><div class="stage-up-text">單字升級到 ' + stageNames[stage] + '！</div>';
+  document.body.appendChild(div);
+  setTimeout(function() { div.classList.add('show'); }, 50);
+  setTimeout(function() { div.classList.remove('show'); }, 2500);
+  setTimeout(function() { div.remove(); }, 3000);
+}
+
+// 包裝 updateProgress：保留多巴胺，把 FSRS 邏輯接進來
+var _originalUpdateProgress = updateProgress;
+updateProgress = async function(wordId, correct, gameType, extra) {
+  // 如果有 gameType，走完整的 FSRS 流程
+  if (gameType) {
+    var payload = {
+      wordId: wordId,
+      gameType: gameType,
+      mistakes: extra && extra.mistakes != null ? extra.mistakes : (correct ? 0 : 1),
+      timeUsed: extra && extra.timeUsed != null ? extra.timeUsed : 0,
+      hintUsed: extra && extra.hintUsed != null ? extra.hintUsed : 0
+    };
+    return await finishWordRound(payload);
+  }
+  // 沒有 gameType 就走舊邏輯（向後相容）
+  return await _originalUpdateProgress(wordId, correct);
+};
+
+// 進入遊戲時重置 session 計數
+var _origStartGame2 = startGame;
+startGame = async function(gameId) {
+  resetSession();
+  return await _origStartGame2(gameId);
+};

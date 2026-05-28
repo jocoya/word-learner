@@ -448,9 +448,23 @@ async function addWord() {
     document.getElementById('newImageUrl3').value.trim(),
   ].filter(Boolean);
   if (localImageData) images.push(localImageData);
-  await dbAdd('words', { word, meaning, pos, antonym, definition, tags, sentences, images, imageUrl: null, imageLocal: null, pool: 'permanent', createdAt: Date.now() });
+  var alreadyKnown = document.getElementById('newAlreadyKnown') && document.getElementById('newAlreadyKnown').checked;
+  var newId = await dbAdd('words', { word, meaning, pos, antonym, definition, tags, sentences, images, imageUrl: null, imageLocal: null, pool: 'permanent', createdAt: Date.now() });
+  // 如果勾選「已會」，初始化 progress 為大師期
+  if (alreadyKnown && newId) {
+    var p = fsrsInitProgress(newId);
+    p.stability = 30;
+    p.difficulty = 3;
+    p.reps = 10;
+    p.state = 'review';
+    p.lastReview = Date.now();
+    p.due = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    p.unlockedStages = [1, 2, 3];
+    await dbPut('progress', p);
+  }
   ['newWord','newMeaning','newTags','newAntonym','newDefinition','newSentence1','newSentence2','newSentence3','newImageUrl1','newImageUrl2','newImageUrl3'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('newPos').value = '';
+  if (document.getElementById('newAlreadyKnown')) document.getElementById('newAlreadyKnown').checked = false;
   document.getElementById('imagePreview').innerHTML = '';
   document.getElementById('imagePreview').hidden = true;
   document.getElementById('imageSearchResults').hidden = true;

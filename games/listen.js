@@ -80,7 +80,7 @@ function initListenGame(area, words, mode) {
           }
           if (isCorrect) correct++;
           speakWord(target.word);
-          updateProgress(target.id, isCorrect);
+          updateProgress(target.id, isCorrect, 'listen', { mistakes: isCorrect ? 0 : 1 });
           document.getElementById('gameScore').textContent = correct + ' / ' + (current + 1);
           area.querySelectorAll(selector).forEach(function(b) { b.style.pointerEvents = 'none'; });
           setTimeout(function() { current++; renderQuestion(); }, 1500);

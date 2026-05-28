@@ -69,8 +69,8 @@ function initEchoGame(area, words) {
       bindEchoMic(target);
     }
 
-    window.skipZoo = function() { updateProgress(target.id, false); current++; renderQuestion(); };
-    window.skipEcho = function() { updateProgress(target.id, false); current++; renderQuestion(); };
+    window.skipZoo = function() { updateProgress(target.id, false, 'echo', { mistakes: 1 }); current++; renderQuestion(); };
+    window.skipEcho = function() { updateProgress(target.id, false, 'echo', { mistakes: 1 }); current++; renderQuestion(); };
   }
 
   function bindZooMic(target) {
@@ -122,7 +122,7 @@ function initEchoGame(area, words) {
           status.textContent = '恐龍醒來了！🎉';
           status.style.color = '#4CAF50';
           feedback.innerHTML = '<span style="color:#4CAF50;font-size:1.3em;font-weight:700;">太棒了！</span>';
-          updateProgress(target.id, true);
+          updateProgress(target.id, true, 'echo', { mistakes: 0 });
           document.getElementById('gameScore').textContent = correct + ' / ' + (current+1);
           setTimeout(function() { current++; renderQuestion(); }, 2000);
         } else {
@@ -190,7 +190,7 @@ function initEchoGame(area, words) {
         } else {
           feedback.innerHTML = '<span style="color:#FF9800;">你說了「' + esc(best) + '」，再試一次？</span>';
         }
-        updateProgress(target.id, found);
+        updateProgress(target.id, found, 'echo', { mistakes: found ? 0 : 1 });
         document.getElementById('gameScore').textContent = correct + ' / ' + (current+1);
         recognition = null;
         if (found) setTimeout(function() { current++; renderQuestion(); }, 2000);

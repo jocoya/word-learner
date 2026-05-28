@@ -1137,3 +1137,36 @@ body {
   font-size: 1em; padding: 0 2px; opacity: .8;
 }
 .tag-chip-x:hover { opacity: 1; }
+
+/* 浮動獎勵 */
+.floating-reward {
+  position: fixed; top: 50%; left: 50%; z-index: 9999;
+  font-size: 4em; font-weight: 800;
+  pointer-events: none;
+  text-shadow: 0 0 20px currentColor, 0 4px 8px rgba(0,0,0,.3);
+  animation: floatReward 1.8s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+@keyframes floatReward {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  20% { transform: translate(-50%, -50%) scale(1.4); opacity: 1; }
+  60% { transform: translate(-50%, -100%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -200%) scale(0.8); opacity: 0; }
+}
+
+/* 階段升級橫幅 */
+.stage-up-banner {
+  position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%) scale(0);
+  background: linear-gradient(135deg, #FFD700, #FF6B35);
+  color: #fff; padding: 24px 40px; border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(255,107,53,.5);
+  z-index: 9999; pointer-events: none;
+  text-align: center;
+  transition: transform 0.4s cubic-bezier(.34,1.56,.64,1), opacity 0.4s;
+  opacity: 0;
+}
+.stage-up-banner.show {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+.stage-up-icon { font-size: 3em; }
+.stage-up-text { font-size: 1.5em; font-weight: 700; margin-top: 8px; }

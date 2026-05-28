@@ -103,7 +103,7 @@ function initFillBlankGame(area, words) {
         resultEl.style.color = '#f44336';
         speakWord(sentence, 0.7);
       }
-      updateProgress(target.id, isCorrect);
+      updateProgress(target.id, isCorrect, 'fillblank', { mistakes: isCorrect ? 0 : 1 });
       document.getElementById('gameScore').textContent = `${correct} / ${current + 1}`;
       // 禁用操作
       document.getElementById('sortCheckBtn').disabled = true;
