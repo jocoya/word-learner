@@ -196,11 +196,51 @@
           <input id="examNewMeaning" type="text" placeholder="中文意思" />
         </div>
         <div class="form-row">
-          <input id="examNewSentence1" type="text" placeholder="例句 1" />
+          <select id="examNewPos">
+            <option value="">詞性（選填）</option>
+            <option value="noun">名詞 noun</option>
+            <option value="verb">動詞 verb</option>
+            <option value="adj">形容詞 adj</option>
+            <option value="adv">副詞 adv</option>
+            <option value="prep">介系詞 prep</option>
+            <option value="other">其他</option>
+          </select>
+          <input id="examNewAntonym" type="text" placeholder="反義詞（選填）" />
         </div>
         <div class="form-row">
-          <input id="examNewImageUrl" type="text" placeholder="圖片 URL（選填）" />
-          <button class="btn-upload" type="button" onclick="searchImages('examNewWord', 'examImageSearchResults')">🔍 搜圖</button>
+          <input id="examNewDefinition" type="text" placeholder="英英解釋（選填）" />
+          <button class="btn-upload" type="button" onclick="aiGenerateDefinition('examNewWord','examNewDefinition')">🤖 AI生成</button>
+        </div>
+        <div class="form-row">
+          <select id="examTagDropdown" onchange="addTagFromDropdown('examTagDropdown','examNewTags','examTagChips')"><option value="">選擇標籤...</option></select>
+          <input id="examNewTagManual" type="text" placeholder="新標籤" style="flex:1;" />
+          <button class="btn-upload" type="button" onclick="addManualTag('examNewTagManual','examNewTags','examTagChips')">＋</button>
+        </div>
+        <input type="hidden" id="examNewTags" />
+        <div class="tag-chips" id="examTagChips"></div>
+        <div class="form-row">
+          <input id="examNewSentence1" type="text" placeholder="例句 1" />
+          <button class="btn-upload" type="button" onclick="aiGenerateSentence('examNewWord','examNewSentence1')">🤖 生成</button>
+        </div>
+        <div class="form-row">
+          <input id="examNewSentence2" type="text" placeholder="例句 2（選填）" />
+          <button class="btn-upload" type="button" onclick="aiGenerateSentence('examNewWord','examNewSentence2')">🤖 生成</button>
+        </div>
+        <div class="form-row">
+          <input id="examNewSentence3" type="text" placeholder="例句 3（選填）" />
+          <button class="btn-upload" type="button" onclick="aiGenerateSentence('examNewWord','examNewSentence3')">🤖 生成</button>
+        </div>
+        <div class="form-row">
+          <input id="examNewImageUrl1" type="text" placeholder="圖片 1 URL（選填）" />
+          <button class="btn-upload" type="button" onclick="searchImages('examNewWord','examImageSearchResults','examNewImageUrl1')">🔍 搜圖</button>
+        </div>
+        <div class="form-row">
+          <input id="examNewImageUrl2" type="text" placeholder="圖片 2 URL（選填）" />
+          <button class="btn-upload" type="button" onclick="searchImages('examNewWord','examImageSearchResults','examNewImageUrl2')">🔍 搜圖</button>
+        </div>
+        <div class="form-row">
+          <input id="examNewImageUrl3" type="text" placeholder="圖片 3 URL（選填）" />
+          <button class="btn-upload" type="button" onclick="searchImages('examNewWord','examImageSearchResults','examNewImageUrl3')">🔍 搜圖</button>
           <label class="btn-upload">
             📷 相簿
             <input id="examNewImageFile" type="file" accept="image/*" onchange="handleExamImageUpload(event)" hidden />

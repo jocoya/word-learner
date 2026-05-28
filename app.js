@@ -137,15 +137,28 @@ async function showResult(correct, total) {
   }
   goTo('page-result');
 
-  // 追蹤每日遊戲完成次數，每5次跳寶箱
+  // 追蹤每日遊戲完成次數，每4次跳寶箱
   if (dailyRole) {
     var coins = await getCoins();
     var today = getTodayStr();
     var dayKey = 'dailyPlays-' + today;
     coins[dayKey] = (coins[dayKey] || 0) + 1;
     await saveCoins(coins);
-    if (coins[dayKey] % 5 === 0) {
+    // 顯示進度
+    var playCount = coins[dayKey];
+    var toNextChest = 4 - (playCount % 4);
+    if (playCount % 4 === 0) {
+      // 滿4次跳寶箱
+      var pInfo = document.createElement('div');
+      pInfo.style.cssText = 'margin-top:12px;color:#FFD700;font-weight:700;';
+      pInfo.textContent = '🎁 寶箱解鎖了！';
+      document.querySelector('.result-screen').appendChild(pInfo);
       setTimeout(function() { showChestModal(); }, 1500);
+    } else {
+      var pInfo = document.createElement('div');
+      pInfo.style.cssText = 'margin-top:12px;color:#fff;opacity:.85;';
+      pInfo.textContent = '今日已挑戰 ' + playCount + ' 次 · 還差 ' + toNextChest + ' 次開寶箱';
+      document.querySelector('.result-screen').appendChild(pInfo);
     }
   }
 }
@@ -635,7 +648,9 @@ async function renderExamList() {
 async function openExam(id) {
   currentExamId = id;
   document.getElementById('examDetailTitle').textContent = (await dbGet('exams', id)).name;
-  goTo('page-exam-detail'); renderExamWordList();
+  goTo('page-exam-detail');
+  renderExamWordList();
+  loadTagDropdown('examTagDropdown');
 }
 async function renderExamWordList() {
   const words = await dbGetByIndex('words', 'pool', 'exam-' + currentExamId);
@@ -651,12 +666,33 @@ async function addExamWord() {
   const word = document.getElementById('examNewWord').value.trim();
   const meaning = document.getElementById('examNewMeaning').value.trim();
   if (!word || !meaning) return alert('請輸入單字和中文意思');
-  const sentence = document.getElementById('examNewSentence1').value.trim();
-  const imageUrl = document.getElementById('examNewImageUrl').value.trim();
-  const images = []; if (imageUrl) images.push(imageUrl); if (examLocalImageData) images.push(examLocalImageData);
-  await dbAdd('words', { word, meaning, tags: [], sentences: sentence?[sentence]:[], images, imageUrl:null, imageLocal:null, pool:'exam-'+currentExamId, createdAt:Date.now() });
-  ['examNewWord','examNewMeaning','examNewSentence1','examNewImageUrl'].forEach(id => { document.getElementById(id).value=''; });
-  document.getElementById('examImagePreview').hidden = true; examLocalImageData = null;
+  const pos = document.getElementById('examNewPos').value;
+  const antonym = document.getElementById('examNewAntonym').value.trim();
+  const definition = document.getElementById('examNewDefinition').value.trim();
+  const tags = parseTags(document.getElementById('examNewTags').value);
+  const sentences = [
+    document.getElementById('examNewSentence1').value.trim(),
+    document.getElementById('examNewSentence2').value.trim(),
+    document.getElementById('examNewSentence3').value.trim(),
+  ].filter(Boolean);
+  const images = [
+    document.getElementById('examNewImageUrl1').value.trim(),
+    document.getElementById('examNewImageUrl2').value.trim(),
+    document.getElementById('examNewImageUrl3').value.trim(),
+  ].filter(Boolean);
+  if (examLocalImageData) images.push(examLocalImageData);
+  await dbAdd('words', {
+    word, meaning, pos, antonym, definition, tags, sentences, images,
+    imageUrl: null, imageLocal: null,
+    pool: 'exam-' + currentExamId, createdAt: Date.now()
+  });
+  ['examNewWord','examNewMeaning','examNewAntonym','examNewDefinition','examNewTags','examNewSentence1','examNewSentence2','examNewSentence3','examNewImageUrl1','examNewImageUrl2','examNewImageUrl3'].forEach(id => { var el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('examNewPos').value = '';
+  document.getElementById('examImagePreview').innerHTML = '';
+  document.getElementById('examImagePreview').hidden = true;
+  document.getElementById('examImageSearchResults').hidden = true;
+  document.getElementById('examTagChips').innerHTML = '';
+  examLocalImageData = null;
   renderExamWordList();
 }
 async function deleteExamWord(id) { if (!confirm('確定刪除？')) return; await dbDelete('words',id); renderExamWordList(); }

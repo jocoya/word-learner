@@ -1,4 +1,4 @@
-const CACHE = 'word-learner-v10';
+const CACHE = 'word-learner-v11';
 const ASSETS = [
   './index.html',
   './style.css',
