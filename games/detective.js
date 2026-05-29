@@ -1,4 +1,36 @@
 // 線索偵探遊戲
+
+// 詞性英文 → 中文
+var POS_ZH = {
+  noun: '名詞', verb: '動詞', adj: '形容詞', adv: '副詞',
+  prep: '介系詞', other: '單字'
+};
+
+// 缺英英解釋時的智慧 fallback：詞性 + 首字母 + 字數
+function buildWordHint(target) {
+  var parts = [];
+  if (target.pos && POS_ZH[target.pos]) {
+    parts.push('這是一個「' + POS_ZH[target.pos] + '」');
+  } else {
+    parts.push('猜猜這個字');
+  }
+  var letters = target.word.replace(/\s/g, '').length;
+  parts.push('開頭是「' + target.word.charAt(0).toUpperCase() + '」');
+  parts.push('總共 ' + letters + ' 個字母');
+  if (target.antonym && target.antonym.trim()) {
+    parts.push('反義詞是「' + target.antonym + '」');
+  }
+  return parts.join('，') + '。';
+}
+
+// 逐步揭示字母骨架：露出前 n 個字母，其餘用底線
+function buildLetterSkeleton(word, revealCount) {
+  return word.split('').map(function(ch, i) {
+    if (ch === ' ') return ' ';
+    return i < revealCount ? ch : '_';
+  }).join(' ');
+}
+
 function initDetectiveGame(area, words) {
   var supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
   var withSentence = words.filter(function(w) { return w.sentences && w.sentences.length > 0; });
@@ -15,20 +47,27 @@ function initDetectiveGame(area, words) {
     var target = queue[current];
     var sentences = (target.sentences || []).slice();
     var clues = [];
-    // 第一個固定是英英解釋
-    if (target.definition) {
-      clues.push(target.definition);
+
+    // 線索 1：英英解釋。沒有就用「詞性 + 首字母 + 字數」智慧 fallback
+    if (target.definition && target.definition.trim()) {
+      clues.push('📖 ' + target.definition);
     } else {
-      clues.push('(no definition)');
+      clues.push('🔤 ' + buildWordHint(target));
     }
-    // 第二個是例句（挖空答案）
+
+    // 線索 2：例句（挖空答案）
     var shuffledSen = shuffleArray(sentences);
     var wordRegex = new RegExp('\\b' + target.word + '\\b', 'gi');
     if (shuffledSen.length >= 1) {
-      clues.push(shuffledSen[0].replace(wordRegex, '______'));
+      clues.push('💬 ' + shuffledSen[0].replace(wordRegex, '______'));
     }
-    // 第三個固定是中文
-    clues.push(target.meaning);
+
+    // 線索 3：逐步揭示字母（首字母 + 字數骨架）
+    clues.push('✏️ ' + buildLetterSkeleton(target.word, 1));
+
+    // 線索 4：中文意思（最後才給）
+    clues.push('🀄 ' + target.meaning);
+
     var clueIdx = 0;
 
     // 底線提示：每個字母一個底線
@@ -61,22 +100,38 @@ function initDetectiveGame(area, words) {
       '</div>';
 
     clueIdx = 1;
+    var letterReveal = 1; // 底部骨架已揭示的字母數
 
     window.revealNextClue = function() {
-      if (clueIdx >= clues.length) return;
-      for (var i = 0; i < clueIdx; i++) {
-        var prev = document.getElementById('detCard' + i);
-        if (prev) prev.style.opacity = '0.4';
+      // 階段一：逐張揭示線索卡
+      if (clueIdx < clues.length) {
+        for (var i = 0; i < clueIdx; i++) {
+          var prev = document.getElementById('detCard' + i);
+          if (prev) prev.style.opacity = '0.4';
+        }
+        var card = document.getElementById('detCard' + clueIdx);
+        if (card) {
+          card.style.transition = 'opacity 0.5s, transform 0.5s';
+          card.style.opacity = '1';
+          card.style.transform = 'translateY(0)';
+        }
+        clueIdx++;
+        // 線索看完後，按鈕轉成「再給一個字母」
+        if (clueIdx >= clues.length) {
+          var btn = document.getElementById('detClueBtn');
+          if (btn) btn.textContent = '🔡 再給一個字母';
+        }
+        return;
       }
-      var card = document.getElementById('detCard' + clueIdx);
-      if (card) {
-        card.style.transition = 'opacity 0.5s, transform 0.5s';
-        card.style.opacity = '1';
-        card.style.transform = 'translateY(0)';
-      }
-      clueIdx++;
-      if (clueIdx >= clues.length) {
-        document.getElementById('detClueBtn').style.display = 'none';
+      // 階段二：逐步在底部骨架揭示字母
+      var wordLen = target.word.replace(/\s/g, '').length;
+      if (letterReveal < wordLen) {
+        letterReveal++;
+        document.getElementById('detBlanks').innerHTML = buildLetterSkeleton(target.word, letterReveal);
+        if (letterReveal >= wordLen) {
+          var b = document.getElementById('detClueBtn');
+          if (b) b.style.display = 'none';
+        }
       }
     };
 

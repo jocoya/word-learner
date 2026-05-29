@@ -1,9 +1,57 @@
-// 句子排列遊戲（原圖片填空，改為拖拉排列單字卡片）
+// 把句子切成「語塊」（lexical chunks），教小孩英文的自然組合方式
+// 規則：冠詞/所有格+形容詞+名詞 成一塊、介系詞片語成一塊、be/助動詞+動詞成一塊
+function chunkSentence(sentence) {
+  var clean = sentence.replace(/[.!?,;:"]/g, '').trim();
+  var tokens = clean.split(/\s+/).filter(Boolean);
+  if (tokens.length <= 2) return tokens; // 太短直接逐字
+
+  var DET   = ['the','a','an','this','that','these','those','my','your','his','her','its','our','their','some','any','no','each','every'];
+  var PREP  = ['in','on','at','to','with','for','from','by','of','into','onto','up','down','over','under','about','after','before','near','behind','between','around','through'];
+  var BEAUX = ['is','am','are','was','were','be','been','being','can','could','will','would','shall','should','do','does','did','has','have','had','may','might','must',
+               "don't","doesn't","didn't","can't","won't","isn't","aren't","wasn't","weren't"];
+  var CONJ  = ['and','but','or','so','because','then','when','if','while'];
+  var PRON  = ['i','you','he','she','it','we','they'];
+
+  function typeOf(w) {
+    var lw = w.toLowerCase();
+    if (DET.indexOf(lw) !== -1) return 'DET';
+    if (PREP.indexOf(lw) !== -1) return 'PREP';
+    if (BEAUX.indexOf(lw) !== -1) return 'BEAUX';
+    if (CONJ.indexOf(lw) !== -1) return 'CONJ';
+    if (PRON.indexOf(lw) !== -1) return 'PRON';
+    return 'OTHER';
+  }
+
+  var chunks = [], cur = [];
+  for (var i = 0; i < tokens.length; i++) {
+    var type = typeOf(tokens[i]);
+    var prevType = i > 0 ? typeOf(tokens[i - 1]) : null;
+    var boundary = false;
+    if (i === 0) {
+      boundary = false;
+    } else if (type === 'PREP' || type === 'CONJ' || type === 'BEAUX' || type === 'PRON') {
+      boundary = true;
+    } else if (type === 'DET') {
+      // 新名詞片語的開頭，但介系詞後面的冠詞要黏在一起（in the park）
+      boundary = (prevType !== 'PREP');
+    }
+    if (boundary && cur.length > 0) { chunks.push(cur); cur = []; }
+    cur.push(tokens[i]);
+  }
+  if (cur.length > 0) chunks.push(cur);
+
+  var result = chunks.map(function(c) { return c.join(' '); });
+  // 保險：如果只切出 1 塊，退回逐字切
+  if (result.length < 2) return tokens;
+  return result;
+}
+
+// 句子排列遊戲（原圖片填空，改為拖拉排列「語塊」卡片）
 function initFillBlankGame(area, words) {
-  // 只選有短例句的單字（8個字以內）
+  // 只選有例句的單字（語塊化後對長句也友善，不再硬性限制字數）
   const withSentence = words.filter(w => {
     if (!w.sentences || w.sentences.length === 0) return false;
-    return w.sentences.some(s => s.split(/\s+/).length <= 8);
+    return w.sentences.some(s => s && s.trim().split(/\s+/).length >= 2);
   });
   if (withSentence.length < 4) {
     area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有例句的單字才能玩排列遊戲！</p>';
@@ -20,13 +68,20 @@ function initFillBlankGame(area, words) {
       return;
     }
     const target = queue[current];
-    // 只選短例句（8個字以內）
-    const shortSentences = (target.sentences || []).filter(s => s.split(/\s+/).length <= 8);
-    const sentence = shortSentences.length > 0 ? shortSentences[Math.floor(Math.random() * shortSentences.length)] : null;
+    // 選一個句子（語塊化後不需限制長度，挑最短的讓小孩好上手）
+    const validSentences = (target.sentences || []).filter(s => s && s.trim().split(/\s+/).length >= 2);
+    let sentence = null;
+    if (validSentences.length > 0) {
+      // 偏好較短的句子
+      const sorted = validSentences.slice().sort((a, b) => a.split(/\s+/).length - b.split(/\s+/).length);
+      // 從最短的前半隨機挑一個，增加變化
+      const pickPool = sorted.slice(0, Math.max(1, Math.ceil(sorted.length / 2)));
+      sentence = pickPool[Math.floor(Math.random() * pickPool.length)];
+    }
     if (!sentence) { current++; renderQuestion(); return; }
     const img = getRandomImage(target);
-    // 把句子拆成單字卡片
-    const correctWords = sentence.replace(/[.!?,;:'"]/g, '').split(/\s+/).filter(Boolean);
+    // 把句子切成「語塊」卡片
+    const correctWords = chunkSentence(sentence);
     const shuffled = shuffleArray([...correctWords]);
 
     area.innerHTML = `
@@ -36,7 +91,7 @@ function initFillBlankGame(area, words) {
           ${esc(target.meaning)}
           <button onclick="speakWord('${esc(sentence)}', 0.7)" style="background:none;border:none;font-size:1.2em;cursor:pointer;vertical-align:middle;">🔊</button>
         </div>
-        <p style="color:#999;margin-bottom:12px;">把單字排成正確的句子</p>
+        <p style="color:#999;margin-bottom:12px;">把語塊排成正確的句子</p>
         <div class="sort-slots" id="sortSlots"></div>
         <div class="sort-bank" id="sortBank">
           ${shuffled.map((w, i) => `<button class="sort-word" data-idx="${i}" data-word="${esc(w)}">${esc(w)}</button>`).join('')}
