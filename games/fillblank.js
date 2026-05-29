@@ -1,9 +1,14 @@
 // 把句子切成「語塊」（lexical chunks），教小孩英文的自然組合方式
-// 規則：冠詞/所有格+形容詞+名詞 成一塊、介系詞片語成一塊、be/助動詞+動詞成一塊
-function chunkSentence(sentence) {
+// 原則：
+//   1. 目標單字永遠獨立成塊（學習重點）
+//   2. 主詞 / 動詞 / 受詞 之間切開（SVO 結構，依 British Council 詞序教學）
+//   3. 冠詞+形容詞+名詞 黏成一塊（the big dog）
+//   4. 介系詞片語（in the park）黏成一塊
+//   5. be/助動詞 + 主動詞 黏一塊（is running，時態語塊）
+function chunkSentence(sentence, targetWord) {
   var clean = sentence.replace(/[.!?,;:"]/g, '').trim();
   var tokens = clean.split(/\s+/).filter(Boolean);
-  if (tokens.length <= 2) return tokens; // 太短直接逐字
+  if (tokens.length <= 1) return tokens;
 
   var DET   = ['the','a','an','this','that','these','those','my','your','his','her','its','our','their','some','any','no','each','every'];
   var PREP  = ['in','on','at','to','with','for','from','by','of','into','onto','up','down','over','under','about','after','before','near','behind','between','around','through'];
@@ -22,27 +27,57 @@ function chunkSentence(sentence) {
     return 'OTHER';
   }
 
+  var tw = targetWord ? targetWord.toLowerCase().replace(/[^a-z']/g, '') : null;
+  function isTarget(w) {
+    if (!tw) return false;
+    return w.toLowerCase().replace(/[^a-z']/g, '') === tw;
+  }
+
   var chunks = [], cur = [];
+  function flush() { if (cur.length > 0) { chunks.push(cur); cur = []; } }
+  function curStartsWithDet() { return cur.length > 0 && typeOf(cur[0]) === 'DET'; }
+
   for (var i = 0; i < tokens.length; i++) {
-    var type = typeOf(tokens[i]);
+    var w = tokens[i];
+    var type = typeOf(w);
     var prevType = i > 0 ? typeOf(tokens[i - 1]) : null;
+
+    // 規則 1：目標單字永遠獨立成塊
+    if (isTarget(w)) {
+      flush();
+      chunks.push([w]);
+      continue;
+    }
+
     var boundary = false;
     if (i === 0) {
       boundary = false;
     } else if (type === 'PREP' || type === 'CONJ' || type === 'BEAUX' || type === 'PRON') {
+      // 介系詞 / 連接詞 / be 助動詞 / 代名詞主詞 → 起新塊
       boundary = true;
     } else if (type === 'DET') {
-      // 新名詞片語的開頭，但介系詞後面的冠詞要黏在一起（in the park）
+      // 名詞片語開頭，但介系詞後的冠詞要黏在一起（in the park）
       boundary = (prevType !== 'PREP');
+    } else { // OTHER：名詞 / 動詞 / 形容詞
+      if (prevType === 'BEAUX') {
+        boundary = false;           // is running 黏一起
+      } else if (prevType === 'DET' || (prevType === 'OTHER' && curStartsWithDet())) {
+        boundary = false;           // 名詞片語內（the big dog）黏一起
+      } else if (prevType === 'PREP') {
+        boundary = false;           // 介系詞直接接名詞（to school）黏一起
+      } else {
+        boundary = true;            // 動詞接受詞 / 主詞接動詞 → 切開
+      }
     }
-    if (boundary && cur.length > 0) { chunks.push(cur); cur = []; }
-    cur.push(tokens[i]);
+
+    if (boundary) flush();
+    cur.push(w);
   }
-  if (cur.length > 0) chunks.push(cur);
+  flush();
 
   var result = chunks.map(function(c) { return c.join(' '); });
-  // 保險：如果只切出 1 塊，退回逐字切
-  if (result.length < 2) return tokens;
+  // 保險：如果只切出 1 塊（且原句不只 1 字），退回逐字切
+  if (result.length < 2 && tokens.length > 1) return tokens;
   return result;
 }
 
@@ -80,8 +115,8 @@ function initFillBlankGame(area, words) {
     }
     if (!sentence) { current++; renderQuestion(); return; }
     const img = getRandomImage(target);
-    // 把句子切成「語塊」卡片
-    const correctWords = chunkSentence(sentence);
+    // 把句子切成「語塊」卡片（目標單字會獨立成塊）
+    const correctWords = chunkSentence(sentence, target.word);
     const shuffled = shuffleArray([...correctWords]);
 
     area.innerHTML = `
