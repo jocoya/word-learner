@@ -17,6 +17,13 @@
   <div id="page-home" class="page active">
     <div class="home-bg">
       <h1 class="home-title">🌟 英文單字學習樂園 🌟</h1>
+      <div class="child-switch" id="childSwitch">
+        <span class="child-switch-label">現在是誰在玩？</span>
+        <div class="child-switch-btns">
+          <button class="child-btn" id="childBtnBoy" onclick="setChild('boy')">👦 小男生</button>
+          <button class="child-btn" id="childBtnGirl" onclick="setChild('girl')">👧 小女生</button>
+        </div>
+      </div>
       <p class="home-sub">選擇你的模式</p>
       <div class="profile-cards">
         <button class="profile-card baby" onclick="enterMode('baby')">

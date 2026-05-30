@@ -69,15 +69,17 @@ async function loadDailyLevels() {
   if (g) g.value = s.girl || 'auto';
 }
 
-// 計算「該角色玩過的單字」平均 stability
+// 計算「目前小孩」玩過的單字平均 stability
 async function getRoleAvgStability(role) {
-  var coins = await getCoins();
-  // 我們沒有「該角色玩過哪些單字」的紀錄，改用整體 progress 平均
   var allProgress = await dbGetAll('progress');
   if (!allProgress.length) return 0;
+  var suffix = '_' + role;
   var sum = 0, count = 0;
   for (var i = 0; i < allProgress.length; i++) {
-    var p = (typeof fsrsUpgrade === 'function') ? fsrsUpgrade(allProgress[i]) : allProgress[i];
+    var rec = allProgress[i];
+    // 只看該小孩專屬的進度（key 以 _boy / _girl 結尾）
+    if (typeof rec.wordId !== 'string' || rec.wordId.indexOf(suffix) === -1) continue;
+    var p = (typeof fsrsUpgrade === 'function') ? fsrsUpgrade(rec) : rec;
     if (p.reps && p.reps > 0) { sum += (p.stability || 0); count++; }
   }
   return count > 0 ? sum / count : 0;
@@ -150,6 +152,8 @@ function showSegmentBanner(text, callback) {
 // 主入口：取代原本的 startDailyWithRole
 startDailyWithRole = async function(role) {
   dailyRole = role;
+  currentChild = role; // 每日挑戰的小孩 = 進度歸屬的小孩
+  if (typeof updateChildSwitchUI === 'function') updateChildSwitchUI();
   currentMode = 'kid';
   resetSession();
 
@@ -363,16 +367,18 @@ async function finishWordRound(payload) {
   if (!payload || !payload.wordId) return;
   var result = await recordGameResult(payload);
 
-  // 連續 3 題 Easy 且該單字今天第一次複習 → 給鑽石
+  // 連續 3 題 Easy 且該單字今天第一次複習 → 給鑽石（歸目前小孩）
   if (result.isEasy && result.isFirstToday) {
     sessionEasyStreak++;
     if (sessionEasyStreak >= 3) {
       sessionEasyStreak = 0;
       sessionDiamondsEarned++;
       var coins = await getCoins();
-      coins.rewards = coins.rewards || {};
-      coins.rewards['diamond'] = (coins.rewards['diamond'] || 0) + 1;
-      coins.log.push({ role: '-', count: 0, date: getTodayStr(), chest: '💎 連續 Easy 鑽石' });
+      var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+      var fieldName = child === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
+      coins[fieldName] = coins[fieldName] || {};
+      coins[fieldName]['diamond'] = (coins[fieldName]['diamond'] || 0) + 1;
+      coins.log.push({ role: child, count: 0, date: getTodayStr(), chest: '💎 連續 Easy 鑽石' });
       await saveCoins(coins);
       showFloatingReward('💎 +1', '#00bcd4');
     }
@@ -434,3 +440,8 @@ startGame = async function(gameId) {
   resetSession();
   return await _origStartGame2(gameId);
 };
+
+// ===== 啟動：載入上次選的小孩 =====
+if (typeof loadCurrentChild === 'function') {
+  loadCurrentChild();
+}

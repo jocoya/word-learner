@@ -18,6 +18,7 @@ function goTo(pageId) {
     if (srcEl) srcEl.parentElement.style.display = '';
   }
   if (pageId === 'page-daily-pick' && typeof loadDailyLevels === 'function') loadDailyLevels();
+  if (pageId === 'page-home' && typeof updateChildSwitchUI === 'function') updateChildSwitchUI();
 }
 
 function enterMode(mode) {
@@ -25,6 +26,28 @@ function enterMode(mode) {
   dailyRole = null;
   renderGameCards();
   goTo('page-games');
+}
+
+// ===== 多小孩切換 =====
+// currentChild 由 fsrs-engine.js 宣告（全域）。這裡負責 UI 與持久化。
+function setChild(child) {
+  currentChild = child;
+  // 同步到設定，下次開啟記住
+  dbPut('settings', { key: 'currentChild', value: child });
+  updateChildSwitchUI();
+}
+
+function updateChildSwitchUI() {
+  var boyBtn = document.getElementById('childBtnBoy');
+  var girlBtn = document.getElementById('childBtnGirl');
+  if (boyBtn) boyBtn.classList.toggle('active', currentChild === 'boy');
+  if (girlBtn) girlBtn.classList.toggle('active', currentChild === 'girl');
+}
+
+async function loadCurrentChild() {
+  var s = await dbGet('settings', 'currentChild');
+  if (s && s.value) currentChild = s.value;
+  updateChildSwitchUI();
 }
 
 const GAMES = [
@@ -451,17 +474,19 @@ async function addWord() {
   if (localImageData) images.push(localImageData);
   var alreadyKnown = document.getElementById('newAlreadyKnown') && document.getElementById('newAlreadyKnown').checked;
   var newId = await dbAdd('words', { word, meaning, pos, antonym, definition, tags, sentences, images, imageUrl: null, imageLocal: null, pool: 'permanent', createdAt: Date.now() });
-  // 如果勾選「已會」，初始化 progress 為大師期
+  // 如果勾選「已會」，為兩個小孩都初始化 progress 為大師期
   if (alreadyKnown && newId) {
-    var p = fsrsInitProgress(newId);
-    p.stability = 30;
-    p.difficulty = 3;
-    p.reps = 10;
-    p.state = 'review';
-    p.lastReview = Date.now();
-    p.due = Date.now() + 30 * 24 * 60 * 60 * 1000;
-    p.unlockedStages = [1, 2, 3];
-    await dbPut('progress', p);
+    for (const child of ['boy', 'girl']) {
+      var p = fsrsInitProgress(newId + '_' + child);
+      p.stability = 30;
+      p.difficulty = 3;
+      p.reps = 10;
+      p.state = 'review';
+      p.lastReview = Date.now();
+      p.due = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      p.unlockedStages = [1, 2, 3];
+      await dbPut('progress', p);
+    }
   }
   ['newWord','newMeaning','newTags','newAntonym','newDefinition','newSentence1','newSentence2','newSentence3','newImageUrl1','newImageUrl2','newImageUrl3'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('newPos').value = '';
@@ -534,7 +559,11 @@ function getWordImage(w) {
 
 async function deleteWord(id) {
   if (!confirm('確定刪除？')) return;
-  await dbDelete('words', id); await dbDelete('progress', id);
+  await dbDelete('words', id);
+  // 刪除舊的共用進度 + 兩個小孩各自的進度
+  await dbDelete('progress', id);
+  await dbDelete('progress', id + '_boy');
+  await dbDelete('progress', id + '_girl');
   renderWordList();
 }
 
@@ -845,23 +874,26 @@ async function mergeWordIntoPermanent(examWord, permWord) {
   if (!permWord.definition && examWord.definition) permWord.definition = examWord.definition;
   await dbPut('words', permWord);
 
-  // 合併 progress：取 stability 較高者
-  const examP = await dbGet('progress', examWord.id);
-  const permP = await dbGet('progress', permWord.id);
-  if (examP) {
+  // 合併 progress：每個小孩各自合併，取 stability 較高者
+  // 同時處理舊的共用進度（numeric key）與分流後的進度（id_boy / id_girl）
+  const progressKeys = [
+    { exam: examWord.id, perm: permWord.id },                       // 舊共用
+    { exam: examWord.id + '_boy', perm: permWord.id + '_boy' },     // 小男生
+    { exam: examWord.id + '_girl', perm: permWord.id + '_girl' }    // 小女生
+  ];
+  for (const pk of progressKeys) {
+    const examP = await dbGet('progress', pk.exam);
+    if (!examP) continue;
+    const permP = await dbGet('progress', pk.perm);
     const eUp = (typeof fsrsUpgrade === 'function') ? fsrsUpgrade(examP) : examP;
     const pUp = permP ? ((typeof fsrsUpgrade === 'function') ? fsrsUpgrade(permP) : permP) : null;
     let winner;
     if (!pUp || (eUp.stability || 0) > (pUp.stability || 0)) {
-      // 用考試包的 progress，但 wordId 改成永久庫的 id
-      winner = Object.assign({}, eUp, { wordId: permWord.id });
-      // 合併 unlockedStages
+      winner = Object.assign({}, eUp, { wordId: pk.perm });
       const merged = (eUp.unlockedStages || []).concat(pUp ? (pUp.unlockedStages || []) : []);
       winner.unlockedStages = Array.from(new Set(merged));
-      // 移除舊的 firestore id 避免覆蓋
       delete winner._firestoreId;
     } else {
-      // 留永久庫的 progress，但合併 unlockedStages
       winner = pUp;
       const merged = (pUp.unlockedStages || []).concat(eUp.unlockedStages || []);
       winner.unlockedStages = Array.from(new Set(merged));
@@ -869,9 +901,11 @@ async function mergeWordIntoPermanent(examWord, permWord) {
     await dbPut('progress', winner);
   }
 
-  // 刪除考試包那筆單字 + 對應 progress
+  // 刪除考試包那筆單字 + 對應 progress（舊共用 + 兩小孩）
   await dbDelete('words', examWord.id);
-  if (examP) await dbDelete('progress', examWord.id);
+  await dbDelete('progress', examWord.id);
+  await dbDelete('progress', examWord.id + '_boy');
+  await dbDelete('progress', examWord.id + '_girl');
 }
 
 // ===== 匯出匯入 =====

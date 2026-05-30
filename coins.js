@@ -2,6 +2,7 @@
 // 覆蓋 app.js 中的 renderCoinPage, redeemCoins, renderCalendar
 
 var pendingRedeemKey = null;
+var pendingRedeemChild = null;
 var REWARDS = [
   { key: '3C', name: '3C禮卷', img: './images/3C.png' },
   { key: 'D', name: '甜點禮卷', img: './images/D.png' },
@@ -10,10 +11,18 @@ var REWARDS = [
   { key: 'diamond', name: '鑽石', img: './images/diamond.png' },
 ];
 
+// 取得某小孩的禮券集合（向後相容：舊資料的 coins.rewards 視為共用，首次顯示時不動）
+function getChildRewards(coins, child) {
+  var fieldName = child === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
+  if (!coins[fieldName]) coins[fieldName] = {};
+  return coins[fieldName];
+}
+
 async function renderCoinPage() {
   var daily = await getDailyData();
   var coins = await getCoins();
-  // 金幣卡
+
+  // 金幣卡（兩個小孩並排）
   document.getElementById('coinSummary').innerHTML =
     '<div class="coin-card">' +
       '<div class="coin-card-row">' +
@@ -30,24 +39,31 @@ async function renderCoinPage() {
       '</div>' +
     '</div>';
 
-  // 獎勵統計
-  var rewards = coins.rewards || {};
+  // 獎勵統計（小男生 / 小女生 各一區）
   var html = '<h3 style="margin:0 0 8px;">獎勵收藏（點擊領取歸零）</h3>';
-  var allItems = [
-    { key: 'boy', name: '貓幣', img: './images/COIN_CAT.png', count: coins.boy },
-    { key: 'girl', name: '狗幣', img: './images/COIN_DOG.png', count: coins.girl },
-  ];
-  REWARDS.forEach(function(r) {
-    allItems.push({ key: r.key, name: r.name, img: r.img, count: rewards[r.key] || 0 });
-  });
-  html += '<div style="display:flex;flex-wrap:wrap;gap:10px;">';
-  allItems.forEach(function(item) {
-    html += '<div class="reward-item" onclick="askRedeem(\'' + item.key + '\',\'' + esc(item.name) + '\',' + item.count + ')">' +
-      '<img src="' + item.img + '" alt="' + esc(item.name) + '">' +
-      '<span class="reward-item-count">x ' + item.count + '</span>' +
+  [
+    { child: 'boy', label: '👦 小男生', coinName: '貓幣', coinImg: './images/COIN_CAT.png', coinCount: coins.boy },
+    { child: 'girl', label: '👧 小女生', coinName: '狗幣', coinImg: './images/COIN_DOG.png', coinCount: coins.girl }
+  ].forEach(function(group) {
+    var rewards = getChildRewards(coins, group.child);
+    html += '<div class="reward-group">';
+    html += '<div class="reward-group-title">' + group.label + '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;">';
+    // 金幣本身
+    html += '<div class="reward-item" onclick="askRedeem(\'' + group.child + '\',\'' + esc(group.coinName) + '\',' + group.coinCount + ',\'' + group.child + '\')">' +
+      '<img src="' + group.coinImg + '" alt="' + esc(group.coinName) + '">' +
+      '<span class="reward-item-count">x ' + group.coinCount + '</span>' +
     '</div>';
+    // 禮券
+    REWARDS.forEach(function(r) {
+      var count = rewards[r.key] || 0;
+      html += '<div class="reward-item" onclick="askRedeem(\'' + r.key + '\',\'' + esc(r.name) + '\',' + count + ',\'' + group.child + '\')">' +
+        '<img src="' + r.img + '" alt="' + esc(r.name) + '">' +
+        '<span class="reward-item-count">x ' + count + '</span>' +
+      '</div>';
+    });
+    html += '</div></div>';
   });
-  html += '</div>';
   document.getElementById('rewardSummary').innerHTML = html;
 
   renderCalendar(daily.completedDates);
@@ -60,7 +76,7 @@ async function renderCoinPage() {
     logEl.innerHTML = coins.log.slice(-20).reverse().map(function(l) {
       var icon = l.role === 'boy'
         ? '<img src="./images/COIN_CAT.png" style="width:24px;">'
-        : '<img src="./images/COIN_DOG.png" style="width:24px;">';
+        : (l.role === 'girl' ? '<img src="./images/COIN_DOG.png" style="width:24px;">' : '🎁');
       var text = l.redeemed
         ? '已領取 ' + l.redeemed
         : (l.chest ? '開寶箱: ' + l.chest : '+' + l.count);
@@ -74,11 +90,13 @@ async function renderCoinPage() {
   checkChestReward();
 }
 
-function askRedeem(key, name, count) {
+function askRedeem(key, name, count, child) {
   if (count === 0) return;
   pendingRedeemKey = key;
+  pendingRedeemChild = child || null;
   document.getElementById('redeemTitle').textContent = '確定要領取嗎？';
-  document.getElementById('redeemDesc').textContent = name + ' x ' + count + ' 將歸零';
+  var who = child === 'boy' ? '👦 ' : (child === 'girl' ? '👧 ' : '');
+  document.getElementById('redeemDesc').textContent = who + name + ' x ' + count + ' 將歸零';
   document.getElementById('modal-redeem').hidden = false;
 }
 
@@ -92,14 +110,15 @@ async function confirmRedeem() {
     coins.log.push({ role: 'girl', count: 0, date: getTodayStr(), redeemed: coins.girl });
     coins.girl = 0;
   } else {
-    var rewards = coins.rewards || {};
-    coins.log.push({ role: '-', count: 0, date: getTodayStr(), redeemed: rewards[pendingRedeemKey] || 0, chest: pendingRedeemKey });
+    // 禮券：歸零「該小孩」的那一份
+    var rewards = getChildRewards(coins, pendingRedeemChild || 'boy');
+    coins.log.push({ role: pendingRedeemChild || '-', count: 0, date: getTodayStr(), redeemed: rewards[pendingRedeemKey] || 0, chest: pendingRedeemKey });
     rewards[pendingRedeemKey] = 0;
-    coins.rewards = rewards;
   }
   await saveCoins(coins);
   hideModal('modal-redeem');
   pendingRedeemKey = null;
+  pendingRedeemChild = null;
   renderCoinPage();
 }
 
@@ -151,11 +170,12 @@ async function openChest() {
     document.getElementById('chestRewardImg').innerHTML = '<img src="' + reward.img + '">';
     document.getElementById('chestRewardText').textContent = '獲得 ' + reward.name + '！';
     var coins = await getCoins();
-    var rewards = coins.rewards || {};
+    // 寶箱獎勵歸給「目前小孩」
+    var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+    var rewards = getChildRewards(coins, child);
     rewards[reward.key] = (rewards[reward.key] || 0) + 1;
-    coins.rewards = rewards;
     coins.lastChestDate = getTodayStr();
-    coins.log.push({ role: '-', count: 0, date: getTodayStr(), chest: reward.name });
+    coins.log.push({ role: child, count: 0, date: getTodayStr(), chest: reward.name });
     await saveCoins(coins);
   }, 800);
 }

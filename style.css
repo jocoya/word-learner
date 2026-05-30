@@ -1229,3 +1229,49 @@ body {
   cursor: pointer;
 }
 .daily-level-row select:focus { border-color: #4A90D9; outline: none; }
+
+
+/* ===== 首頁小孩切換 ===== */
+.child-switch {
+  margin: 8px auto 16px;
+  max-width: 420px; width: 90%;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.92);
+  border-radius: 14px;
+  text-align: center;
+}
+.child-switch-label { display: block; font-weight: 700; color: #555; margin-bottom: 8px; }
+.child-switch-btns { display: flex; gap: 10px; justify-content: center; }
+.child-btn {
+  flex: 1;
+  padding: 12px 8px;
+  font-size: 1.05em;
+  font-weight: 700;
+  border: 3px solid #ddd;
+  border-radius: 12px;
+  background: #fff;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.child-btn.active {
+  border-color: #4A90D9;
+  background: #4A90D9;
+  color: #fff;
+  transform: scale(1.04);
+  box-shadow: 0 4px 12px rgba(74,144,217,0.4);
+}
+
+/* ===== 獎勵分組（小男生 / 小女生）===== */
+.reward-group {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 12px;
+}
+.reward-group-title {
+  font-weight: 700;
+  color: #444;
+  margin-bottom: 10px;
+  font-size: 1.05em;
+}

@@ -9,6 +9,29 @@ var REQUEST_RETENTION = 0.9;
 var DECAY = -0.5;
 var FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
 
+// ===== 多小孩進度分流 =====
+// 目前正在學習的小孩：'boy' | 'girl'（由首頁/每日挑戰設定）
+var currentChild = 'boy';
+
+// 進度的儲存 key：每個小孩各自一份，例如 "5_boy"、"5_girl"
+function progressId(wordId) { return String(wordId) + '_' + currentChild; }
+
+// 取得「目前小孩」對某單字的進度
+// lazy 分流：若該小孩還沒有獨立進度，就用舊的共用進度當起點（複製、不動原本那筆）
+async function getProgressFor(wordId) {
+  var childRec = await dbGet('progress', progressId(wordId));
+  if (childRec) return childRec;
+  // 退回舊的共用進度（numeric key）當基礎
+  var legacy = await dbGet('progress', wordId);
+  if (legacy) {
+    var clone = Object.assign({}, legacy);
+    clone.wordId = progressId(wordId);
+    delete clone._firestoreId; // 避免覆蓋舊那筆的 Firestore 文件
+    return clone; // 尚未存檔，等下次 put 才真正分流出來
+  }
+  return null;
+}
+
 // 計算記憶可提取性（Retrievability）
 function fsrsRetrievability(elapsedDays, stability) {
   if (stability <= 0) return 0;
@@ -157,8 +180,8 @@ function gameToRating(payload) {
 // 回傳獎勵資訊：{ rating, coinEarned, diamondEarned, stageUnlocked }
 async function recordGameResult(payload) {
   var rating = gameToRating(payload);
-  var p = await dbGet('progress', payload.wordId);
-  if (!p) p = fsrsInitProgress(payload.wordId);
+  var p = await getProgressFor(payload.wordId);
+  if (!p) p = fsrsInitProgress(progressId(payload.wordId));
   else p = fsrsUpgrade(p);
 
   var prevS = p.stability || 0;
@@ -171,6 +194,7 @@ async function recordGameResult(payload) {
   // 套用 FSRS
   var newP = fsrsReview(p, rating);
   newP.todayReviewed = todayStr;
+  newP.wordId = progressId(payload.wordId); // 確保 key 是本小孩專屬
 
   // 檢查階段升級
   var stageThresholds = [{level: 1, s: 2}, {level: 2, s: 8}, {level: 3, s: 20}];
@@ -196,7 +220,7 @@ async function recordGameResult(payload) {
   };
 }
 
-// 取得今日該複習的單字（FSRS 版本，R<90%）
+// 取得今日該複習的單字（FSRS 版本，R<90%）— 依目前小孩
 async function getDueWordsFSRS(pool) {
   var all = pool === 'permanent'
     ? await dbGetByIndex('words', 'pool', 'permanent')
@@ -204,7 +228,7 @@ async function getDueWordsFSRS(pool) {
   var now = Date.now();
   var due = [];
   for (var i = 0; i < all.length; i++) {
-    var p = await dbGet('progress', all[i].id);
+    var p = await getProgressFor(all[i].id);
     if (!p) { due.push(all[i]); continue; }
     p = fsrsUpgrade(p);
     if (p.due <= now) due.push(all[i]);
@@ -247,9 +271,9 @@ var GAME_NAMES_ZH = {
   detective: '線索偵探'
 };
 
-// 取得單字的當前 stability（沒有 progress 紀錄就回 0）
+// 取得單字的當前 stability（沒有 progress 紀錄就回 0）— 依目前小孩
 async function getWordStability(wordId) {
-  var p = await dbGet('progress', wordId);
+  var p = await getProgressFor(wordId);
   if (!p) return 0;
   p = fsrsUpgrade(p);
   return p.stability || 0;
