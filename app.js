@@ -912,18 +912,27 @@ async function mergeWordIntoPermanent(examWord, permWord) {
 function showImportExport() { document.getElementById('modal-import').hidden = false; }
 function hideModal(id) { document.getElementById(id).hidden = true; }
 async function exportAllData() {
-  const data = { words: await dbGetAll('words'), exams: await dbGetAll('exams'), progress: await dbGetAll('progress'), exportedAt: new Date().toISOString() };
+  const data = {
+    words: await dbGetAll('words'),
+    exams: await dbGetAll('exams'),
+    progress: await dbGetAll('progress'),
+    settings: await dbGetAll('settings'),  // 含金幣、禮券、每日挑戰、程度設定
+    exportedAt: new Date().toISOString(),
+    version: 2
+  };
   const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
   const url = URL.createObjectURL(blob); const a = document.createElement('a');
-  a.href = url; a.download = 'word-learner-backup.json'; a.click(); URL.revokeObjectURL(url);
+  a.href = url; a.download = 'word-learner-backup-' + getTodayStr() + '.json'; a.click(); URL.revokeObjectURL(url);
 }
 async function importAllData(e) {
   const file = e.target.files[0]; if (!file) return;
+  if (!confirm('匯入會新增單字並覆蓋進度/金幣資料，建議先備份目前資料。確定匯入？')) { e.target.value = ''; return; }
   try {
     const data = JSON.parse(await file.text());
-    if (data.words) for (const w of data.words) { delete w.id; await dbAdd('words',w); }
-    if (data.exams) for (const ex of data.exams) { delete ex.id; await dbAdd('exams',ex); }
+    if (data.words) for (const w of data.words) { delete w.id; delete w._firestoreId; delete w._localId; await dbAdd('words',w); }
+    if (data.exams) for (const ex of data.exams) { delete ex.id; delete ex._firestoreId; delete ex._localId; await dbAdd('exams',ex); }
     if (data.progress) for (const p of data.progress) await dbPut('progress',p);
+    if (data.settings) for (const s of data.settings) await dbPut('settings',s);  // 還原金幣/禮券/設定
     alert('匯入成功！'); hideModal('modal-import'); renderWordList();
   } catch (err) { alert('匯入失敗：'+err.message); }
 }
