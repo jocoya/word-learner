@@ -1275,3 +1275,31 @@ body {
   margin-bottom: 10px;
   font-size: 1.05em;
 }
+
+
+/* ===== 首頁工具列（更新 / 清除快取）===== */
+.home-tools {
+  display: flex; gap: 10px; justify-content: center;
+  margin-top: 14px;
+}
+.home-tool-btn {
+  padding: 8px 16px;
+  font-size: 0.9em;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.home-tool-btn:active { background: rgba(255,255,255,0.35); }
+
+/* ===== 版本號（右下角）===== */
+.app-version {
+  position: absolute;
+  right: 10px; bottom: 8px;
+  font-size: 0.78em;
+  color: rgba(255,255,255,0.65);
+  pointer-events: none;
+  z-index: 5;
+}

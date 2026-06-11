@@ -41,7 +41,12 @@
       <button class="btn-manage" onclick="goTo('page-exams')">📝 考試複習包</button>
       <button class="btn-manage" onclick="startDailyChallenge()">🔥 每日挑戰</button>
       <button class="btn-manage" onclick="goTo('page-coins')">🪙 金幣庫</button>
+      <div class="home-tools">
+        <button class="home-tool-btn" onclick="appUpdate()">🔄 更新</button>
+        <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
+      </div>
     </div>
+    <div class="app-version" id="appVersion">v16</div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -415,8 +420,61 @@
   <script src="coins.js"></script>
   <script src="patches.js"></script>
   <script>
+    var APP_VERSION = 'v16';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
+      // 接收 service worker 回傳的版本號
+      navigator.serviceWorker.addEventListener('message', function(e) {
+        var d = e.data || {};
+        if (d.type === 'VERSION' && d.version) {
+          var v = d.version.replace('word-learner-', '');
+          var el = document.getElementById('appVersion');
+          if (el) el.textContent = v;
+        } else if (d.type === 'MEDIA_CACHE_CLEARED') {
+          alert('已清除圖片/音檔快取！下次讀取會重新下載。');
+        }
+      });
+      // 查詢目前版本
+      navigator.serviceWorker.ready.then(function(reg) {
+        if (reg.active) reg.active.postMessage({ type: 'GET_VERSION' });
+      });
+    }
+
+    // 🔄 更新：抓最新程式並重整
+    async function appUpdate() {
+      try {
+        if ('serviceWorker' in navigator) {
+          var reg = await navigator.serviceWorker.getRegistration();
+          if (reg) {
+            await reg.update();
+            if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        }
+      } catch (e) { /* 忽略，照常重整 */ }
+      location.reload(true);
+    }
+
+    // 🗑️ 清除圖片/音檔快取
+    async function appClearCache() {
+      if (!confirm('清除已下載的圖片和語音快取？\n（單字資料和學習進度不受影響，下次讀取會重新下載）')) return;
+      try {
+        // 顯示目前用量
+        if (navigator.storage && navigator.storage.estimate) {
+          var est = await navigator.storage.estimate();
+          console.log('Storage used:', Math.round((est.usage||0)/1048576) + ' MB');
+        }
+        if ('serviceWorker' in navigator) {
+          var reg = await navigator.serviceWorker.getRegistration();
+          if (reg && reg.active) {
+            reg.active.postMessage({ type: 'CLEAR_MEDIA_CACHE' });
+            return; // 等 service worker 回 MEDIA_CACHE_CLEARED
+          }
+        }
+        // 沒有 service worker 時直接清
+        var keys = await caches.keys();
+        await Promise.all(keys.filter(function(k){return k.indexOf('media')!==-1;}).map(function(k){return caches.delete(k);}));
+        alert('已清除快取！');
+      } catch (e) { alert('清除快取失敗：' + e.message); }
     }
   </script>
 </body>
