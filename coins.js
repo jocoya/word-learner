@@ -122,7 +122,7 @@ async function confirmRedeem() {
   renderCoinPage();
 }
 
-// 寶箱邏輯
+// 連續遊玩獎勵：連續 7 天 → 給鑽石（不再給寶箱）
 async function checkChestReward() {
   var daily = await getDailyData();
   var coins = await getCoins();
@@ -133,18 +133,28 @@ async function checkChestReward() {
     if (dates.indexOf(dateOnly) === -1) dates.push(dateOnly);
   });
   dates.sort();
-  var lastChestDate = coins.lastChestDate || '';
-  // 計算從 lastChestDate 之後的連續天數
+  var lastStreakReward = coins.lastStreakRewardDate || '';
+  // 計算從上次發獎之後的連續天數
   var streak = 0;
   var d = new Date();
   for (var i = 0; i < 30; i++) {
     var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-    if (ds <= lastChestDate) break;
+    if (ds <= lastStreakReward) break;
     if (dates.indexOf(ds) !== -1) streak++;
     else if (i > 0) break;
     d.setDate(d.getDate() - 1);
   }
-  if (streak >= 7) showChestModal();
+  if (streak >= 7) {
+    // 給目前小孩一顆鑽石
+    var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+    var fieldName = child === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
+    coins[fieldName] = coins[fieldName] || {};
+    coins[fieldName]['diamond'] = (coins[fieldName]['diamond'] || 0) + 1;
+    coins.lastStreakRewardDate = getTodayStr();
+    coins.log.push({ role: child, count: 0, date: getTodayStr(), chest: '🔥 連續 7 天鑽石' });
+    await saveCoins(coins);
+    if (typeof showFloatingReward === 'function') showFloatingReward('🔥 連續7天 💎+1', '#00bcd4');
+  }
 }
 
 function showChestModal() {

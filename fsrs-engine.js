@@ -9,6 +9,18 @@ var REQUEST_RETENTION = 0.9;
 var DECAY = -0.5;
 var FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
 
+// ===== 升級節奏調校（讓單字慢慢升，要常玩才會進步）=====
+var FIRST_PLAY_SCALE = 0.3;  // 第一次玩的初始 stability 縮放（避免一次猜對就暴衝）
+var GROWTH_SCALE = 0.5;      // 後續每次 stability 成長幅度縮放（爬升減半）
+var MIN_ELAPSED_DAYS = 0.3;  // 同一天重複玩時，假設至少間隔的天數（讓連玩也有微量成長）
+
+// 階段門檻（stability）：熟悉期 / 應用期 / 大師期
+var STAGE_THRESHOLDS = [
+  { level: 1, s: 3 },   // 熟悉期
+  { level: 2, s: 15 },  // 應用期
+  { level: 3, s: 40 }   // 大師期
+];
+
 // ===== 多小孩進度分流 =====
 // 目前正在學習的小孩：'boy' | 'girl'（由首頁/每日挑戰設定）
 var currentChild = 'boy';
@@ -86,12 +98,14 @@ function fsrsReview(progress, rating) {
   var newS, newD;
 
   if (progress.reps === 0) {
-    // 第一次複習：使用初始值
-    newS = w[rating - 1]; // w0~w3 對應 Again/Hard/Good/Easy 的初始穩定度
+    // 第一次複習：使用初始值，但大幅壓低避免暴衝
+    newS = w[rating - 1] * FIRST_PLAY_SCALE; // w0~w3 對應 Again/Hard/Good/Easy
     newD = w[4] - (rating - 3) * w[5];
     newD = Math.max(1, Math.min(10, newD));
   } else {
-    var r = fsrsRetrievability(elapsedDays, progress.stability);
+    // 同一天重複玩時，套用最小間隔下限，讓連玩也有微量成長（選項 C）
+    var effectiveElapsed = Math.max(elapsedDays, MIN_ELAPSED_DAYS);
+    var r = fsrsRetrievability(effectiveElapsed, progress.stability);
 
     if (rating === 1) {
       // Again：穩定度大幅下降
@@ -101,14 +115,15 @@ function fsrsReview(progress, rating) {
       newS = Math.max(0.1, newS);
       progress.lapses++;
     } else {
-      // Hard/Good/Easy：穩定度增加
+      // Hard/Good/Easy：穩定度增加（成長幅度減半，爬升放慢）
       var hardPenalty = rating === 2 ? w[15] : 1;
       var easyBonus = rating === 4 ? w[16] : 1;
-      newS = progress.stability * (1 + Math.exp(w[8]) *
+      var growth = Math.exp(w[8]) *
              (11 - progress.difficulty) *
              Math.pow(progress.stability, -w[9]) *
              (Math.exp((1 - r) * w[10]) - 1) *
-             hardPenalty * easyBonus);
+             hardPenalty * easyBonus;
+      newS = progress.stability * (1 + growth * GROWTH_SCALE);
     }
     newD = progress.difficulty - w[6] * (rating - 3);
     newD = w[7] * 5 + (1 - w[7]) * newD;
@@ -197,10 +212,9 @@ async function recordGameResult(payload) {
   newP.wordId = progressId(payload.wordId); // 確保 key 是本小孩專屬
 
   // 檢查階段升級
-  var stageThresholds = [{level: 1, s: 2}, {level: 2, s: 8}, {level: 3, s: 20}];
   var unlockedStages = newP.unlockedStages || [];
   var newStageUnlocked = null;
-  stageThresholds.forEach(function(stage) {
+  STAGE_THRESHOLDS.forEach(function(stage) {
     if (prevS < stage.s && newP.stability >= stage.s && unlockedStages.indexOf(stage.level) === -1) {
       unlockedStages.push(stage.level);
       newStageUnlocked = stage.level;
@@ -236,26 +250,26 @@ async function getDueWordsFSRS(pool) {
   return due;
 }
 
-// 根據 S 值推薦遊戲類型（鷹架理論）
+// 根據 S 值推薦遊戲類型（鷹架理論）— 對齊新門檻 熟悉3/應用15/大師40
 function recommendGameByStability(stability) {
-  if (stability < 2) return ['memory', 'listen'];
-  if (stability < 8) return ['bubble'];
-  if (stability < 20) return ['spelling', 'detective'];
+  if (stability < 3) return ['memory', 'listen'];
+  if (stability < 15) return ['bubble'];
+  if (stability < 40) return ['spelling', 'detective'];
   return ['fillblank'];
 }
 
 // ===== 遊戲難度門檻系統（鷹架理論）=====
-// 每個遊戲對應一個最低 stability 要求
+// 每個遊戲對應一個最低 stability 要求（對齊放慢後的升級曲線）
 var GAME_MIN_STABILITY = {
   memory: 0,      // 翻牌配對 - 認知最低
   listen: 0,      // 看字選圖 - 認字配對
   flashlight: 0,  // 探照燈尋寶 - 探索式
   bubble: 1,      // 泡泡戳戳樂 - 需要快速反應
   echo: 1,        // 魔法發音動物園 - 跟讀
-  spelling: 4,    // 拼字挑戰 - 需要會拼
-  speak: 4,       // 看圖說句 - 需要會用
-  fillblank: 10,  // 句子排列 - 需要情境理解
-  detective: 10   // 線索偵探 - 需要推敲
+  spelling: 3,    // 拼字挑戰 - 需要會拼（約熟悉期）
+  speak: 3,       // 看圖說句 - 需要會用
+  fillblank: 8,   // 句子排列 - 需要情境理解（接近應用期）
+  detective: 8    // 線索偵探 - 需要推敲
 };
 
 // 遊戲名稱對應（給友善提示用）

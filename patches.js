@@ -386,11 +386,17 @@ async function finishWordRound(payload) {
     sessionEasyStreak = 0;
   }
 
-  // 階段升級 → 寶箱
+  // 階段升級獎勵
   if (result.stageUnlocked) {
     sessionStageUnlocks.push(result.stageUnlocked);
-    showStageUpAnimation(result.stageUnlocked);
-    setTimeout(function() { showChestModal(); }, 1500);
+    if (result.stageUnlocked === 1) {
+      // 熟悉期：全螢幕 Level Up 動畫（不給寶箱）
+      showLevelUpAnimation(result.stageUnlocked);
+    } else {
+      // 應用期 / 大師期：升級動畫 + 寶箱
+      showLevelUpAnimation(result.stageUnlocked);
+      setTimeout(function() { showChestModal(); }, 1800);
+    }
   }
 
   return result;
@@ -405,15 +411,22 @@ function showFloatingReward(text, color) {
   setTimeout(function() { div.remove(); }, 1800);
 }
 
-function showStageUpAnimation(stage) {
+function showLevelUpAnimation(stage) {
   var stageNames = ['', '熟悉期', '應用期', '大師期'];
+  var stageColors = ['', '#4CAF50', '#FF9800', '#E91E63'];
+  var stageEmojis = ['', '🌱', '⭐', '👑'];
   var div = document.createElement('div');
-  div.className = 'stage-up-banner';
-  div.innerHTML = '<div class="stage-up-icon">🌟</div><div class="stage-up-text">單字升級到 ' + stageNames[stage] + '！</div>';
+  div.className = 'levelup-overlay';
+  div.innerHTML =
+    '<div class="levelup-box" style="--lvc:' + stageColors[stage] + '">' +
+      '<div class="levelup-emoji">' + stageEmojis[stage] + '</div>' +
+      '<div class="levelup-title">LEVEL UP!</div>' +
+      '<div class="levelup-stage">升級到「' + stageNames[stage] + '」</div>' +
+    '</div>';
   document.body.appendChild(div);
-  setTimeout(function() { div.classList.add('show'); }, 50);
-  setTimeout(function() { div.classList.remove('show'); }, 2500);
-  setTimeout(function() { div.remove(); }, 3000);
+  setTimeout(function() { div.classList.add('show'); }, 30);
+  setTimeout(function() { div.classList.remove('show'); }, 2200);
+  setTimeout(function() { div.remove(); }, 2700);
 }
 
 // 包裝 updateProgress：保留多巴胺，把 FSRS 邏輯接進來

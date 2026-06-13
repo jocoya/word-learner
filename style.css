@@ -1303,3 +1303,49 @@ body {
   pointer-events: none;
   z-index: 5;
 }
+
+
+/* ===== 全螢幕 Level Up 動畫 ===== */
+.levelup-overlay {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.6);
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.levelup-overlay.show { opacity: 1; }
+.levelup-box {
+  text-align: center;
+  transform: scale(0.5) rotate(-8deg);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.levelup-overlay.show .levelup-box { transform: scale(1) rotate(0deg); }
+.levelup-emoji {
+  font-size: 5em;
+  animation: levelupBounce 0.8s ease infinite alternate;
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.4));
+}
+.levelup-title {
+  font-size: 2.6em;
+  font-weight: 900;
+  color: var(--lvc, #FFD700);
+  text-shadow: 0 3px 0 rgba(0,0,0,0.25), 0 0 24px var(--lvc, #FFD700);
+  letter-spacing: 2px;
+  margin: 8px 0;
+}
+.levelup-stage {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: #fff;
+  background: var(--lvc, #FFD700);
+  display: inline-block;
+  padding: 8px 22px;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+}
+@keyframes levelupBounce {
+  from { transform: translateY(0) scale(1); }
+  to   { transform: translateY(-14px) scale(1.08); }
+}

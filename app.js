@@ -161,29 +161,22 @@ async function showResult(correct, total) {
   }
   goTo('page-result');
 
-  // 追蹤每日遊戲完成次數，每4次跳寶箱
+  // 完成挑戰：額外多給金幣（不再每 4 次給寶箱）
   if (dailyRole) {
     var coins = await getCoins();
     var today = getTodayStr();
     var dayKey = 'dailyPlays-' + today;
     coins[dayKey] = (coins[dayKey] || 0) + 1;
+    // 完成一場挑戰額外 +2 金幣
+    var bonus = 2;
+    if (dailyRole === 'boy') coins.boy = (coins.boy || 0) + bonus;
+    else coins.girl = (coins.girl || 0) + bonus;
+    coins.log.push({ role: dailyRole, count: bonus, date: today, chest: '🎯 完成挑戰獎勵' });
     await saveCoins(coins);
-    // 顯示進度
-    var playCount = coins[dayKey];
-    var toNextChest = 4 - (playCount % 4);
-    if (playCount % 4 === 0) {
-      // 滿4次跳寶箱
-      var pInfo = document.createElement('div');
-      pInfo.style.cssText = 'margin-top:12px;color:#FFD700;font-weight:700;';
-      pInfo.textContent = '🎁 寶箱解鎖了！';
-      document.querySelector('.result-screen').appendChild(pInfo);
-      setTimeout(function() { showChestModal(); }, 1500);
-    } else {
-      var pInfo = document.createElement('div');
-      pInfo.style.cssText = 'margin-top:12px;color:#fff;opacity:.85;';
-      pInfo.textContent = '今日已挑戰 ' + playCount + ' 次 · 還差 ' + toNextChest + ' 次開寶箱';
-      document.querySelector('.result-screen').appendChild(pInfo);
-    }
+    var pInfo = document.createElement('div');
+    pInfo.style.cssText = 'margin-top:12px;color:#FFD700;font-weight:700;';
+    pInfo.textContent = '🎯 完成挑戰！額外 +' + bonus + ' 金幣';
+    document.querySelector('.result-screen').appendChild(pInfo);
   }
 }
 
