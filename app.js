@@ -143,40 +143,57 @@ async function showResult(correct, total) {
   document.getElementById('resultStats').textContent  = `答對 ${correct} / ${total} 題`;
   const coinArea = document.getElementById('resultCoinArea');
   if (dailyRole && pct >= 0.5) {
-    // 檢查今天是否已經拿過金幣
-    checkDailyCoinLimit(dailyRole).then(function(canEarn) {
-      if (canEarn) {
-        awardDailyCoin(dailyRole).then(function() {
-          var coinImg = dailyRole === 'boy' ? './images/COIN_CAT.png' : './images/COIN_DOG.png';
-          if (coinArea) coinArea.innerHTML = '<div class="coin-earn-anim"><img src="' + coinImg + '" style="width:48px;height:48px;"> +1</div>';
-        });
-      } else {
-        if (coinArea) coinArea.innerHTML = '<div style="color:#999;">今天已經拿過金幣了！明天再來 🎉</div>';
-      }
-    });
+    // 每日挑戰：完成給 1 金幣，一天一次（不可重複刷）
+    const canEarn = await checkDailyCoinLimit(dailyRole);
+    if (canEarn) {
+      await awardDailyCoin(dailyRole);
+      var coinImg = dailyRole === 'boy' ? './images/COIN_CAT.png' : './images/COIN_DOG.png';
+      if (coinArea) coinArea.innerHTML = '<div class="coin-earn-anim"><img src="' + coinImg + '" style="width:48px;height:48px;"> +1</div>';
+      // 給完金幣後檢查「連續 5 天」→ 給鑽石
+      await checkStreakDiamond(dailyRole);
+    } else {
+      if (coinArea) coinArea.innerHTML = '<div style="color:#999;">今天已經拿過金幣了！明天再來 🎉</div>';
+    }
   } else if (dailyRole && coinArea) {
     coinArea.innerHTML = '<div style="color:#999;">這次沒拿到金幣，再試一次！</div>';
   } else if (coinArea) {
     coinArea.innerHTML = '';
   }
   goTo('page-result');
+}
 
-  // 完成挑戰：額外多給金幣（不再每 4 次給寶箱）
-  if (dailyRole) {
-    var coins = await getCoins();
-    var today = getTodayStr();
-    var dayKey = 'dailyPlays-' + today;
-    coins[dayKey] = (coins[dayKey] || 0) + 1;
-    // 完成一場挑戰額外 +2 金幣
-    var bonus = 2;
-    if (dailyRole === 'boy') coins.boy = (coins.boy || 0) + bonus;
-    else coins.girl = (coins.girl || 0) + bonus;
-    coins.log.push({ role: dailyRole, count: bonus, date: today, chest: '🎯 完成挑戰獎勵' });
+// 連續 5 天都有玩 → 給目前角色鑽石 x1（每次達標只給一次）
+async function checkStreakDiamond(role) {
+  var coins = await getCoins();
+  var daily = await getDailyData();
+  // 收集所有完成的日期（不分角色）
+  var dates = {};
+  daily.completedDates.forEach(function(d) {
+    dates[d.replace(/^(boy|girl)-/, '')] = true;
+  });
+  // 從今天往回數連續天數
+  var streak = 0;
+  var d = new Date();
+  for (var i = 0; i < 30; i++) {
+    var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    if (dates[ds]) streak++;
+    else break;
+    d.setDate(d.getDate() - 1);
+  }
+  if (streak > 0 && streak % 5 === 0) {
+    // 用 lastStreakRewardDate 防止同一天重複給
+    if (coins.lastStreakRewardDate === getTodayStr()) return;
+    var fieldName = role === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
+    coins[fieldName] = coins[fieldName] || {};
+    coins[fieldName]['diamond'] = (coins[fieldName]['diamond'] || 0) + 1;
+    coins.lastStreakRewardDate = getTodayStr();
+    coins.log.push({ role: role, count: 0, date: getTodayStr(), chest: '🔥 連續 ' + streak + ' 天鑽石' });
     await saveCoins(coins);
-    var pInfo = document.createElement('div');
-    pInfo.style.cssText = 'margin-top:12px;color:#FFD700;font-weight:700;';
-    pInfo.textContent = '🎯 完成挑戰！額外 +' + bonus + ' 金幣';
-    document.querySelector('.result-screen').appendChild(pInfo);
+    // 鑽石獎勵動畫
+    var div = document.createElement('div');
+    div.className = 'streak-diamond-pop';
+    div.innerHTML = '<img src="./images/diamond.png" style="width:64px;height:64px;"><div>🔥 連續 ' + streak + ' 天！鑽石 +1</div>';
+    document.querySelector('.result-screen').appendChild(div);
   }
 }
 

@@ -1349,3 +1349,22 @@ body {
   from { transform: translateY(0) scale(1); }
   to   { transform: translateY(-14px) scale(1.08); }
 }
+
+
+/* ===== 連續天數鑽石獎勵動畫 ===== */
+.streak-diamond-pop {
+  margin-top: 14px;
+  color: #00bcd4;
+  font-weight: 700;
+  font-size: 1.1em;
+  text-align: center;
+  animation: streakPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.streak-diamond-pop img {
+  animation: levelupBounce 0.8s ease infinite alternate;
+  filter: drop-shadow(0 4px 10px rgba(0,188,212,0.5));
+}
+@keyframes streakPop {
+  from { transform: scale(0.3); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
