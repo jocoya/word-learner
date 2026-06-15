@@ -1656,3 +1656,34 @@ body {
   .monster-modal { max-width: 680px; }
   .monster-creature { font-size: 9em; }
 }
+
+
+/* ===== 開發者：單字熟練度列表 ===== */
+.devword-list {
+  max-height: 60vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 12px 0;
+}
+.devword-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 8px; border-bottom: 1px solid #eee;
+}
+.devword-name { font-weight: 600; color: #333; font-size: 0.95em; }
+.devword-name small { color: #999; font-weight: 400; }
+.devword-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.devword-btns button {
+  padding: 5px 8px; font-size: 0.8em;
+  border: 1px solid #4A90D9; border-radius: 6px;
+  background: #fff; color: #4A90D9; cursor: pointer;
+}
+.devword-btns button:active { background: #4A90D9; color: #fff; }
+
+/* ===== 開發者：增加金幣/鑽石 ===== */
+.devadd-row {
+  display: flex; align-items: center; gap: 10px; margin: 10px 0;
+}
+.devadd-row label { width: 50px; font-weight: 600; color: #555; }
+.devadd-row select, .devadd-row input {
+  flex: 1; padding: 10px; font-size: 1em;
+  border: 2px solid #ddd; border-radius: 8px;
+}

@@ -50,9 +50,9 @@ function openDevPanel() {
       '<div class="dev-btns">' +
         '<button class="dev-btn" onclick="devToggleMode()">' + (DEV_MODE ? '🔴 關閉測試模式' : '🟢 開啟測試模式') + '</button>' +
         '<button class="dev-btn dev-danger" onclick="devResetProgress()">♻️ 重置所有學習進度</button>' +
-        '<button class="dev-btn" onclick="devSetStability()">🎚️ 設定單字熟練度</button>' +
+        '<button class="dev-btn" onclick="devSetStability()">🎚️ 設定單字熟練度（列表）</button>' +
         '<button class="dev-btn" onclick="devPreviewAnimations()">🎬 預覽動畫</button>' +
-        '<button class="dev-btn" onclick="devAddCoins()">💰 加測試金幣/鑽石</button>' +
+        '<button class="dev-btn" onclick="devAddCoins()">💰 增加金幣/鑽石（可選數量）</button>' +
         '<button class="dev-btn" onclick="devTestVoices()">🔊 測試語音</button>' +
         '<button class="dev-btn" onclick="devShowDataInfo()">📊 資料檢視</button>' +
         '<button class="dev-btn" onclick="devToggleFastMode()">⏩ 快速模式：' + (window.DEV_FAST ? '開' : '關') + '</button>' +
@@ -89,18 +89,40 @@ async function devResetProgress() {
   devOut('✅ 已重置 ' + all.length + ' 筆學習進度。所有單字回到認識期。');
 }
 
-// 🎚️ 手動設定某單字的 stability（方便測試進階遊戲門檻）
+// 🎚️ 列出所有單字，直接點按鈕設定熟練度（目前小孩）
 async function devSetStability() {
   var words = await dbGetByIndex('words', 'pool', 'permanent');
   if (!words.length) { devOut('沒有單字'); return; }
-  var word = prompt('輸入英文單字（設定目前小孩「' + currentChild + '」的熟練度）：');
-  if (!word) return;
-  var target = words.find(function(w) { return w.word.toLowerCase() === word.trim().toLowerCase(); });
-  if (!target) { devOut('找不到單字：' + word); return; }
-  var sInput = prompt('設定 stability（0=認識, 3=熟悉, 15=應用, 40=大師）：', '15');
-  var s = parseFloat(sInput);
-  if (isNaN(s)) return;
-  var p = fsrsInitProgress(progressId(target.id));
+  words.sort(function(a, b) { return a.word.toLowerCase().localeCompare(b.word.toLowerCase()); });
+
+  var modal = document.getElementById('modal-dev');
+  var rows = '';
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i];
+    var s = await getWordStability(w.id);
+    var stage = s >= 40 ? '大師' : s >= 15 ? '應用' : s >= 3 ? '熟悉' : '認識';
+    rows += '<div class="devword-row">' +
+      '<span class="devword-name">' + esc(w.word) + ' <small>S=' + s.toFixed(1) + ' ' + stage + '</small></span>' +
+      '<span class="devword-btns">' +
+        '<button onclick="devApplyStability(' + w.id + ',0)">認識</button>' +
+        '<button onclick="devApplyStability(' + w.id + ',3)">熟悉</button>' +
+        '<button onclick="devApplyStability(' + w.id + ',15)">應用</button>' +
+        '<button onclick="devApplyStability(' + w.id + ',40)">大師</button>' +
+      '</span>' +
+    '</div>';
+  }
+  modal.innerHTML =
+    '<div class="modal-content dev-panel">' +
+      '<h3>🎚️ 設定熟練度（' + (currentChild === 'boy' ? '👦 小男生' : '👧 小女生') + '）</h3>' +
+      '<div class="devword-list">' + rows + '</div>' +
+      '<button class="btn-ghost" onclick="openDevPanel()">← 返回工具</button>' +
+    '</div>';
+  modal.hidden = false;
+}
+
+// 套用某單字的熟練度（給目前小孩）
+async function devApplyStability(wordId, s) {
+  var p = fsrsInitProgress(progressId(wordId));
   p.stability = s;
   p.difficulty = 5;
   p.reps = s > 0 ? 5 : 0;
@@ -109,7 +131,7 @@ async function devSetStability() {
   p.due = Date.now() + Math.max(1, Math.round(s)) * 86400000;
   p.unlockedStages = s >= 40 ? [1,2,3] : s >= 15 ? [1,2] : s >= 3 ? [1] : [];
   await dbPut('progress', p);
-  devOut('✅ 已把「' + target.word + '」(' + currentChild + ') 設為 S=' + s);
+  devSetStability(); // 重新整理列表
 }
 
 // 🎬 預覽動畫
@@ -130,17 +152,50 @@ function devPreviewAnimations() {
   next();
 }
 
-// 💰 加測試金幣/鑽石
-async function devAddCoins() {
+// 💰 加金幣/鑽石：可選對象、類型、數量
+function devAddCoins() {
+  var modal = document.getElementById('modal-dev');
+  modal.innerHTML =
+    '<div class="modal-content dev-panel">' +
+      '<h3>💰 增加金幣 / 鑽石</h3>' +
+      '<div class="devadd-row"><label>對象</label>' +
+        '<select id="devAddWho">' +
+          '<option value="boy">👦 小男生</option>' +
+          '<option value="girl">👧 小女生</option>' +
+        '</select></div>' +
+      '<div class="devadd-row"><label>類型</label>' +
+        '<select id="devAddType">' +
+          '<option value="coin">🪙 金幣</option>' +
+          '<option value="diamond">💎 鑽石</option>' +
+          '<option value="3C">3C禮卷</option>' +
+          '<option value="D">甜點禮卷</option>' +
+          '<option value="B">購物禮卷</option>' +
+          '<option value="TV">TV禮卷</option>' +
+        '</select></div>' +
+      '<div class="devadd-row"><label>數量</label>' +
+        '<input type="number" id="devAddAmount" value="10" min="-999" max="999"></div>' +
+      '<button class="dev-btn" onclick="devApplyAddCoins()">✅ 增加</button>' +
+      '<div class="dev-output" id="devOutput"></div>' +
+      '<button class="btn-ghost" onclick="openDevPanel()">← 返回工具</button>' +
+    '</div>';
+  modal.hidden = false;
+}
+
+async function devApplyAddCoins() {
+  var who = document.getElementById('devAddWho').value;
+  var type = document.getElementById('devAddType').value;
+  var amount = parseInt(document.getElementById('devAddAmount').value) || 0;
   var coins = await getCoins();
-  coins.boy = (coins.boy || 0) + 10;
-  coins.girl = (coins.girl || 0) + 10;
-  coins.rewardsBoy = coins.rewardsBoy || {};
-  coins.rewardsGirl = coins.rewardsGirl || {};
-  coins.rewardsBoy['diamond'] = (coins.rewardsBoy['diamond'] || 0) + 3;
-  coins.rewardsGirl['diamond'] = (coins.rewardsGirl['diamond'] || 0) + 3;
+  if (type === 'coin') {
+    coins[who] = Math.max(0, (coins[who] || 0) + amount);
+  } else {
+    var field = who === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
+    coins[field] = coins[field] || {};
+    coins[field][type] = Math.max(0, (coins[field][type] || 0) + amount);
+  }
   await saveCoins(coins);
-  devOut('✅ 男女各 +10 金幣、+3 鑽石');
+  var label = type === 'coin' ? '金幣' : (type === 'diamond' ? '鑽石' : type + '禮卷');
+  devOut('✅ ' + (who === 'boy' ? '小男生' : '小女生') + ' ' + label + ' ' + (amount >= 0 ? '+' : '') + amount);
 }
 
 // 🔊 測試語音：依序念出前 10 個單字
