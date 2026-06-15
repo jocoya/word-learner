@@ -36,6 +36,10 @@ function setChild(child) {
   // 同步到設定，下次開啟記住
   dbPut('settings', { key: 'currentChild', value: child });
   updateChildSwitchUI();
+  // 每天每個小孩第一次選 → 跳每日小怪物（測試模式不跳）
+  if (typeof maybeShowDailyMonster === 'function' && !(typeof devSkipRewards === 'function' && devSkipRewards())) {
+    maybeShowDailyMonster(child);
+  }
 }
 
 function updateChildSwitchUI() {

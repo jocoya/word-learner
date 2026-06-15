@@ -1,4 +1,4 @@
-const CACHE = 'word-learner-v20';
+const CACHE = 'word-learner-v21';
 const MEDIA_CACHE = 'word-learner-media'; // 圖片/音檔（跨版本保留，不隨程式更新清掉）
 const ASSETS = [
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './coins.js',
   './patches.js',
   './dev.js',
+  './monster.js',
   './games/memory.js',
   './games/listen.js',
   './games/fillblank.js',

@@ -30,7 +30,9 @@ fsrs-engine.js   ← FSRS 演算法、多小孩進度分流、遊戲難度門檻
 games/*.js       ← 11 個遊戲（memory, listen, fillblank, spelling, speak, bubble, echo, flashlight, detective, match, cloze）
 app.js           ← 全域狀態、頁面導航、單字/考試包管理、每日挑戰（舊版）、工具函式
 coins.js         ← 金幣庫、禮券、寶箱（覆蓋 app.js 的 renderCoinPage 等）
-patches.js       ← ⚠️ Monkey-patch 覆蓋層（最後載入，覆蓋前面的多個函式）
+dev.js           ← 開發者模式（版本號連點 5 下開啟，不寫進度/不給獎勵 + 開發工具）
+patches.js       ← ⚠️ Monkey-patch 覆蓋層（最後載入，覆蓋前面的多個函式）+ 每日挑戰 + 學習報告
+monster.js       ← 每日小怪物（選小孩時觸發，打敗它=玩單字版遊戲）
 ```
 
 ### 各檔案職責
@@ -154,6 +156,16 @@ updateProgress(wordId, isCorrect, gameType, { mistakes, timeUsed, hintUsed });
 ### 學習報告（patches.js 的 renderReport）
 - 頁面 `page-report`，依小孩顯示：單字總數、已學、今日待複習、各階段分布長條圖、需加強單字（lapses≥2）。
 - 純 CSS 長條圖，無圖表庫。
+
+### 開發者模式（dev.js）
+- 首頁版本號連點 5 下開啟。`DEV_MODE` 為 true 時：`updateProgress` 與每日獎勵都跳過（`devSkipRewards()`）。
+- 工具：重置進度、手動設 stability、預覽動畫、加測試金幣、測試語音、資料檢視、快速模式。
+
+### 每日小怪物（monster.js）
+- `setChild` 觸發 `maybeShowDailyMonster`，每天每個小孩第一次選時跳。
+- 用 `lastMonsterDate-{child}` 記錄（settings），男女分開計算。
+- 智慧選字：優先 due 字，否則全新字。打敗它 = 玩一場單字版遊戲（依 stability 選 listen/spelling/cloze）。
+- 怪物用 emoji + CSS 動畫，無需圖片素材。
 
 ---
 
