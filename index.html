@@ -47,7 +47,7 @@
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v23</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v24</div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -440,7 +440,7 @@
   <script src="patches.js"></script>
   <script src="monster.js"></script>
   <script>
-    var APP_VERSION = 'v23';
+    var APP_VERSION = 'v24';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號
@@ -449,7 +449,11 @@
         if (d.type === 'VERSION' && d.version) {
           var v = d.version.replace('word-learner-', '');
           var el = document.getElementById('appVersion');
-          if (el) el.textContent = v;
+          // 顯示 HTML 版本 / SW 實際版本，不一致代表 SW 還是舊的（需按更新）
+          if (el) {
+            if (v === APP_VERSION) el.textContent = APP_VERSION;
+            else el.textContent = APP_VERSION + ' (SW:' + v + ' 需更新)';
+          }
         } else if (d.type === 'MEDIA_CACHE_CLEARED') {
           alert('已清除圖片/音檔快取！下次讀取會重新下載。');
         }
@@ -460,9 +464,19 @@
       });
     }
 
-    // 🔄 更新：抓最新程式並重整
+    // 🔄 更新：強制清掉程式快取並重抓最新程式
     async function appUpdate() {
       try {
+        // 1. 刪掉所有「程式快取」（保留 media 圖片/音檔快取）
+        if ('caches' in window) {
+          var keys = await caches.keys();
+          await Promise.all(keys.map(function(k) {
+            // 只刪程式快取（word-learner-vXX），保留 word-learner-media
+            if (k.indexOf('media') === -1) return caches.delete(k);
+            return Promise.resolve();
+          }));
+        }
+        // 2. 叫 service worker 更新 + 跳過等待
         if ('serviceWorker' in navigator) {
           var reg = await navigator.serviceWorker.getRegistration();
           if (reg) {
@@ -471,6 +485,7 @@
           }
         }
       } catch (e) { /* 忽略，照常重整 */ }
+      // 3. 強制重整（加時間戳避免瀏覽器自身快取）
       location.reload(true);
     }
 
