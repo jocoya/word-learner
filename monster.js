@@ -5,11 +5,13 @@
 
 var monsterWord = null;    // 今天怪物守的單字
 var monsterMode = 'kid';   // 觸發時的模式（baby / kid）
+var monsterChild = 'boy';  // 觸發時的小孩（標記完成時用，避免 currentChild 被改動）
 var monsterEmojis = ['👹', '👾', '🐉', '👻', '🦖', '🧟', '🦑', '🤖'];
 
 // 進入模式時呼叫
 async function maybeShowDailyMonster(child, mode) {
   monsterMode = mode || 'kid';
+  monsterChild = child;
   var key = 'monsterDone-' + child;
   var s = await dbGet('settings', key);
   var today = getTodayStr();
@@ -167,7 +169,7 @@ function monsterBattleRound(area, target, others, gameType) {
 
 // 標記今天這個小孩已打敗怪物
 async function markMonsterDone() {
-  await dbPut('settings', { key: 'monsterDone-' + currentChild, value: getTodayStr() });
+  await dbPut('settings', { key: 'monsterDone-' + monsterChild, value: getTodayStr() });
 }
 
 function showMonsterDefeated() {

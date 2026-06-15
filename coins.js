@@ -143,6 +143,8 @@ async function openChest() {
     document.getElementById('chestReward').hidden = false;
     document.getElementById('chestRewardImg').innerHTML = '<img src="' + reward.img + '">';
     document.getElementById('chestRewardText').textContent = '獲得 ' + reward.name + '！';
+    // 測試模式：只播動畫，不寫入獎勵
+    if (typeof devSkipRewards === 'function' && devSkipRewards()) return;
     var coins = await getCoins();
     // 寶箱獎勵歸給「目前小孩」
     var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
