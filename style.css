@@ -1495,3 +1495,55 @@ body {
   font-weight: 600; font-size: 0.95em;
 }
 .report-struggle-item small { color: #999; }
+
+
+/* ===== 開發者模式 ===== */
+.dev-indicator {
+  position: fixed; top: 6px; left: 50%; transform: translateX(-50%);
+  background: #f44336; color: #fff;
+  padding: 4px 14px; border-radius: 999px;
+  font-size: 0.8em; font-weight: 700;
+  z-index: 9998; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  display: none;
+}
+.dev-panel { max-width: 420px; }
+.dev-status { margin: 8px 0; font-size: 0.95em; }
+.dev-btns { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.dev-btn {
+  padding: 12px; font-size: 1em; font-weight: 600;
+  border: 2px solid #4A90D9; border-radius: 10px;
+  background: #fff; color: #4A90D9; cursor: pointer;
+  text-align: left;
+}
+.dev-btn:active { background: #E3F2FD; }
+.dev-btn.dev-danger { border-color: #f44336; color: #f44336; }
+.dev-output {
+  background: #f5f5f5; border-radius: 8px; padding: 10px;
+  font-size: 0.9em; color: #333; min-height: 24px;
+  margin-bottom: 12px; word-break: break-all;
+}
+
+
+/* ===== 小寶貝模式：聽音優先（大喇叭、小文字）===== */
+.baby-speak-big {
+  font-size: 3.5em !important;
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  background: #FFD54F;
+  border: none;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  animation: babySpeakPulse 1.5s ease infinite;
+  cursor: pointer;
+}
+.baby-speak-big:active { transform: scale(0.92); }
+@keyframes babySpeakPulse {
+  0%,100% { transform: scale(1); box-shadow: 0 6px 16px rgba(255,213,79,0.4); }
+  50% { transform: scale(1.06); box-shadow: 0 8px 24px rgba(255,213,79,0.7); }
+}
+.baby-word-small {
+  font-size: 1.2em !important;
+  color: #bbb !important;
+  margin-top: 10px;
+  font-weight: 500 !important;
+}

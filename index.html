@@ -47,7 +47,7 @@
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion">v19</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v20</div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -436,9 +436,10 @@
   <script src="games/cloze.js"></script>
   <script src="app.js"></script>
   <script src="coins.js"></script>
+  <script src="dev.js"></script>
   <script src="patches.js"></script>
   <script>
-    var APP_VERSION = 'v19';
+    var APP_VERSION = 'v20';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號

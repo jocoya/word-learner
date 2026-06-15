@@ -434,6 +434,8 @@ function showLevelUpAnimation(stage) {
 // 包裝 updateProgress：保留多巴胺，把 FSRS 邏輯接進來
 var _originalUpdateProgress = updateProgress;
 updateProgress = async function(wordId, correct, gameType, extra) {
+  // 測試模式：不寫進度、不給獎勵
+  if (typeof devSkipRewards === 'function' && devSkipRewards()) return;
   // 如果有 gameType，走完整的 FSRS 流程
   if (gameType) {
     var payload = {

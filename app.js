@@ -145,6 +145,12 @@ async function showResult(correct, total) {
   document.getElementById('resultMsg').textContent   = msgs;
   document.getElementById('resultStats').textContent  = `答對 ${correct} / ${total} 題`;
   const coinArea = document.getElementById('resultCoinArea');
+  var devSkip = (typeof devSkipRewards === 'function' && devSkipRewards());
+  if (devSkip) {
+    if (coinArea) coinArea.innerHTML = '<div style="color:#999;">🛠️ 測試模式：不計獎勵</div>';
+    goTo('page-result');
+    return;
+  }
   if (dailyRole && pct >= 0.5) {
     // 每日挑戰：完成給 1 金幣，一天一次（不可重複刷）
     const canEarn = await checkDailyCoinLimit(dailyRole);

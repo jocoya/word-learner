@@ -11,11 +11,11 @@ function initListenGame(area, words, mode) {
     const options = shuffleArray([target, ...others]);
 
     if (mode === 'baby') {
-      // 小寶貝：左邊大英文字+發音，右邊 2x2 圖片
+      // 小寶貝：聽音 + 圖片為主，文字最小化（4-5 歲還不識字，靠聽和看圖）
       let html = '<div class="baby-layout">';
       html += '<div class="baby-left">';
-      html += '<div class="baby-word">' + esc(target.word) + '</div>';
-      html += '<button class="baby-speak" onclick="speakWord(\'' + esc(target.word) + '\', 0.6)">🔊</button>';
+      html += '<button class="baby-speak baby-speak-big" onclick="speakWord(\'' + esc(target.word) + '\', 0.6)">🔊</button>';
+      html += '<div class="baby-word baby-word-small">' + esc(target.word) + '</div>';
       html += '<div class="baby-progress">' + (current+1) + ' / ' + total + '</div>';
       html += '</div>';
       html += '<div class="baby-grid">';
@@ -42,7 +42,9 @@ function initListenGame(area, words, mode) {
         };
       });
 
+      // 自動念兩次，強化聽覺連結
       setTimeout(function() { speakWord(target.word, 0.6); }, 300);
+      setTimeout(function() { speakWord(target.word, 0.5); }, 1600);
       bindClicks('.baby-cell', target);
     } else {
       // 挑戰模式：上方大圖，下方 4 個英文選項

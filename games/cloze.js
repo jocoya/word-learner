@@ -1,4 +1,15 @@
 // 讀句選字：顯示挖空例句 + 朗讀，從 4 個選項選出正確單字（情境記憶）
+
+// 挑干擾項：優先選同詞性的字（讓選項語法上都能填入空格，逼孩子真正理解語意）
+function pickDistractors(target, pool) {
+  var candidates = pool.filter(function(w) { return w.id !== target.id; });
+  // 同詞性優先
+  var samePos = candidates.filter(function(w) { return target.pos && w.pos === target.pos; });
+  var others = candidates.filter(function(w) { return !(target.pos && w.pos === target.pos); });
+  var ordered = shuffleArray(samePos).concat(shuffleArray(others));
+  return ordered.slice(0, 3);
+}
+
 function initClozeGame(area, words) {
   // 只選有例句的單字
   var withSentence = words.filter(function(w) {
@@ -29,7 +40,7 @@ function initClozeGame(area, words) {
     // 挖空（把目標單字換成底線）
     var blanked = sentence.replace(new RegExp('\\b' + target.word + '\\b', 'gi'), '______');
 
-    var others = shuffleArray(withSentence.filter(function(w) { return w.id !== target.id; })).slice(0, 3);
+    var others = pickDistractors(target, withSentence);
     var options = shuffleArray([target].concat(others));
     var img = getRandomImage(target);
 
@@ -39,7 +50,6 @@ function initClozeGame(area, words) {
         '<div class="cloze-sentence">' + esc(blanked) +
           ' <button class="cloze-speak" onclick="speakWord(\'' + esc(sentence) + '\', 0.7)">🔊</button>' +
         '</div>' +
-        '<div class="cloze-meaning">' + esc(target.meaning) + '</div>' +
         '<div class="cloze-opts">' +
           options.map(function(o) {
             return '<button class="cloze-opt" data-id="' + o.id + '">' + esc(o.word) + '</button>';
