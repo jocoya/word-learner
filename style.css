@@ -1300,8 +1300,9 @@ body {
   right: 10px; bottom: 8px;
   font-size: 0.78em;
   color: rgba(255,255,255,0.65);
-  pointer-events: none;
-  z-index: 5;
+  z-index: 10;
+  cursor: pointer;
+  padding: 6px 10px;
 }
 
 
@@ -1622,3 +1623,36 @@ body {
 .monster-defeated.show { opacity: 1; }
 .monster-defeated-emoji { font-size: 6em; animation: levelupBounce 0.6s ease infinite alternate; }
 .monster-defeated-text { font-size: 1.8em; font-weight: 800; color: #fff; margin-top: 12px; }
+
+
+/* ===== 怪物戰：小寶貝圖片選項 ===== */
+.mb-word-small { font-size: 1.1em; color: #bbb; margin-top: 8px; }
+.mb-opts-img { grid-template-columns: 1fr 1fr; gap: 16px; }
+.mb-opt-img {
+  padding: 8px; height: 140px;
+  display: flex; align-items: center; justify-content: center;
+}
+.mb-opt-img img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+
+/* ===== 大平板適配：全螢幕動畫等比放大 ===== */
+@media (min-width: 1200px) {
+  .levelup-emoji { font-size: 8em; }
+  .levelup-title { font-size: 4em; }
+  .levelup-stage { font-size: 2.2em; padding: 12px 36px; }
+  .monster-defeated-emoji { font-size: 10em; }
+  .monster-defeated-text { font-size: 2.8em; }
+  .segment-banner-inner { font-size: 2.4em; padding: 36px 56px; }
+  .monster-modal { max-width: 520px; }
+  .monster-creature { font-size: 7em; }
+  .monster-word { font-size: 2.4em; }
+  .mb-creature { font-size: 6em; }
+}
+@media (min-width: 2000px) {
+  .levelup-emoji { font-size: 11em; }
+  .levelup-title { font-size: 5.5em; }
+  .levelup-stage { font-size: 3em; }
+  .monster-defeated-emoji { font-size: 14em; }
+  .monster-defeated-text { font-size: 4em; }
+  .monster-modal { max-width: 680px; }
+  .monster-creature { font-size: 9em; }
+}

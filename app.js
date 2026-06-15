@@ -25,6 +25,18 @@ function goTo(pageId) {
 function enterMode(mode) {
   currentMode = mode;
   dailyRole = null;
+  // 進入模式時：每天每個小孩第一次 → 跳每日小怪物（測試模式不跳）
+  // 用對應模式的遊戲打怪物（baby/kid）
+  if (typeof maybeShowDailyMonster === 'function' && !(typeof devSkipRewards === 'function' && devSkipRewards())) {
+    maybeShowDailyMonster(currentChild, mode);
+    return; // 怪物視窗會處理後續導航；沒跳的話下面照常進遊戲選單
+  }
+  renderGameCards();
+  goTo('page-games');
+}
+
+// 怪物視窗沒跳出時，繼續進入遊戲選單
+function proceedToGames() {
   renderGameCards();
   goTo('page-games');
 }
@@ -36,10 +48,6 @@ function setChild(child) {
   // 同步到設定，下次開啟記住
   dbPut('settings', { key: 'currentChild', value: child });
   updateChildSwitchUI();
-  // 每天每個小孩第一次選 → 跳每日小怪物（測試模式不跳）
-  if (typeof maybeShowDailyMonster === 'function' && !(typeof devSkipRewards === 'function' && devSkipRewards())) {
-    maybeShowDailyMonster(child);
-  }
 }
 
 function updateChildSwitchUI() {

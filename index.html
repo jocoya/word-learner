@@ -16,7 +16,7 @@
   <!-- 首頁：選擇角色 -->
   <div id="page-home" class="page active">
     <div class="home-bg">
-      <h1 class="home-title">🌟 英文單字學習樂園 🌟</h1>
+      <h1 class="home-title" onclick="if(typeof devTapVersion==='function')devTapVersion()">🌟 英文單字學習樂園 🌟</h1>
       <div class="child-switch" id="childSwitch">
         <span class="child-switch-label">現在是誰在玩？</span>
         <div class="child-switch-btns">
@@ -47,7 +47,7 @@
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v21</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v22</div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -440,7 +440,7 @@
   <script src="patches.js"></script>
   <script src="monster.js"></script>
   <script>
-    var APP_VERSION = 'v21';
+    var APP_VERSION = 'v22';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號

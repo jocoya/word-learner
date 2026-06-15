@@ -1,5 +1,5 @@
 // ===== 開發者模式（測試用）=====
-// 開啟方式：首頁版本號連點 5 下。開啟後遊戲不寫進度、不給獎勵。
+// 開啟方式：首頁標題或版本號連點 3 下。開啟後遊戲不寫進度、不給獎勵。
 var DEV_MODE = false;
 var _devTapCount = 0;
 var _devTapTimer = null;
@@ -11,12 +11,12 @@ function devToggle() {
   else closeDevPanel();
 }
 
-// 版本號連點 5 下觸發
+// 標題/版本號連點觸發（3 下、2 秒內）
 function devTapVersion() {
   _devTapCount++;
   clearTimeout(_devTapTimer);
-  _devTapTimer = setTimeout(function() { _devTapCount = 0; }, 1500);
-  if (_devTapCount >= 5) {
+  _devTapTimer = setTimeout(function() { _devTapCount = 0; }, 2000);
+  if (_devTapCount >= 3) {
     _devTapCount = 0;
     devToggle();
   }
