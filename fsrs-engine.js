@@ -184,6 +184,16 @@ function gameToRating(payload) {
     if (m === 1) return 2;
     return 1;
   }
+  if (gt === 'cloze') {
+    // 讀句選字：情境記憶，答對給 Good，錯給 Again
+    if (m === 0) return 3;
+    return 1;
+  }
+  if (gt === 'match') {
+    // 連連看：配對成功給 Good，配錯給 Again
+    if (m === 0) return 3;
+    return 1;
+  }
   if (gt === 'echo' || gt === 'speak') {
     if (m === 0) return 3;
     return 1;
@@ -269,7 +279,9 @@ var GAME_MIN_STABILITY = {
   spelling: 3,    // 拼字挑戰 - 需要會拼（約熟悉期）
   speak: 3,       // 看圖說句 - 需要會用
   fillblank: 8,   // 句子排列 - 需要情境理解（接近應用期）
-  detective: 8    // 線索偵探 - 需要推敲
+  detective: 8,   // 線索偵探 - 需要推敲
+  match: 0,       // 連連看 - 認字配對（最低）
+  cloze: 3        // 讀句選字 - 需要情境理解（約熟悉期）
 };
 
 // 遊戲名稱對應（給友善提示用）
@@ -282,7 +294,9 @@ var GAME_NAMES_ZH = {
   spelling: '拼字挑戰',
   speak: '看圖說句',
   fillblank: '句子排列',
-  detective: '線索偵探'
+  detective: '線索偵探',
+  match: '連連看',
+  cloze: '讀句選字'
 };
 
 // 取得單字的當前 stability（沒有 progress 紀錄就回 0）— 依目前小孩

@@ -346,6 +346,8 @@ startGame = async function(gameId) {
       case 'echo':      initEchoGame(area, words); break;
       case 'flashlight':initFlashlightGame(area, words); break;
       case 'detective': initDetectiveGame(area, words); break;
+      case 'match':     initMatchGame(area, words); break;
+      case 'cloze':     initClozeGame(area, words); break;
     }
   }, 500);
 };
@@ -457,4 +459,91 @@ startGame = async function(gameId) {
 // ===== 啟動：載入上次選的小孩 =====
 if (typeof loadCurrentChild === 'function') {
   loadCurrentChild();
+}
+
+
+// ===== 學習報告頁 =====
+async function renderReport(child) {
+  child = child || 'boy';
+  // 切換 tab 樣式
+  var tb = document.getElementById('reportTabBoy');
+  var tg = document.getElementById('reportTabGirl');
+  if (tb) tb.classList.toggle('active', child === 'boy');
+  if (tg) tg.classList.toggle('active', child === 'girl');
+
+  var body = document.getElementById('reportBody');
+  if (body) body.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">統計中...</div>';
+
+  // 取得永久庫所有單字
+  var words = await dbGetByIndex('words', 'pool', 'permanent');
+  var total = words.length;
+
+  // 統計各階段（用該小孩的進度）
+  var suffix = '_' + child;
+  var stages = { 認識: 0, 熟悉: 0, 應用: 0, 大師: 0 };
+  var notStarted = 0;
+  var struggling = []; // lapses 多的單字
+  var dueCount = 0;
+  var now = Date.now();
+
+  for (var i = 0; i < words.length; i++) {
+    var rec = await dbGet('progress', words[i].id + suffix);
+    if (!rec) {
+      // 沒有該小孩的獨立進度，看看有沒有舊共用進度
+      var legacy = await dbGet('progress', words[i].id);
+      if (!legacy) { notStarted++; continue; }
+      rec = legacy;
+    }
+    var p = (typeof fsrsUpgrade === 'function') ? fsrsUpgrade(rec) : rec;
+    var s = p.stability || 0;
+    if (!p.reps || p.reps === 0) { notStarted++; continue; }
+    if (s >= 40) stages['大師']++;
+    else if (s >= 15) stages['應用']++;
+    else if (s >= 3) stages['熟悉']++;
+    else stages['認識']++;
+    if (p.due && p.due <= now) dueCount++;
+    if ((p.lapses || 0) >= 2) {
+      struggling.push({ word: words[i].word, lapses: p.lapses });
+    }
+  }
+
+  var learned = total - notStarted;
+  struggling.sort(function(a, b) { return b.lapses - a.lapses; });
+
+  function bar(label, count, color) {
+    var pct = total > 0 ? Math.round(count / total * 100) : 0;
+    return '<div class="report-bar-row">' +
+      '<span class="report-bar-label">' + label + '</span>' +
+      '<div class="report-bar-track"><div class="report-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>' +
+      '<span class="report-bar-count">' + count + '</span>' +
+    '</div>';
+  }
+
+  var html =
+    '<div class="report-summary">' +
+      '<div class="report-stat"><div class="report-stat-num">' + total + '</div><div class="report-stat-label">單字總數</div></div>' +
+      '<div class="report-stat"><div class="report-stat-num">' + learned + '</div><div class="report-stat-label">已開始學</div></div>' +
+      '<div class="report-stat"><div class="report-stat-num">' + dueCount + '</div><div class="report-stat-label">今日待複習</div></div>' +
+    '</div>' +
+    '<h3 class="report-section-title">各階段分布</h3>' +
+    '<div class="report-bars">' +
+      bar('🌱 認識期', stages['認識'], '#9E9E9E') +
+      bar('📗 熟悉期', stages['熟悉'], '#4CAF50') +
+      bar('⭐ 應用期', stages['應用'], '#FF9800') +
+      bar('👑 大師期', stages['大師'], '#E91E63') +
+      bar('⚪ 還沒學', notStarted, '#E0E0E0') +
+    '</div>';
+
+  if (struggling.length > 0) {
+    html += '<h3 class="report-section-title">需要加強的單字（常答錯）</h3>' +
+      '<div class="report-struggle">' +
+      struggling.slice(0, 10).map(function(s) {
+        return '<span class="report-struggle-item">' + esc(s.word) + ' <small>×' + s.lapses + '</small></span>';
+      }).join('') +
+      '</div>';
+  } else if (learned > 0) {
+    html += '<p style="text-align:center;color:#4CAF50;padding:16px;">太棒了！目前沒有特別困難的單字 🎉</p>';
+  }
+
+  if (body) body.innerHTML = html;
 }

@@ -27,7 +27,7 @@
 firebase SDK (CDN)
 db.js            ← Firebase 初始化、IndexedDB CRUD、舊版 SM-2 演算法、getDueWords
 fsrs-engine.js   ← FSRS 演算法、多小孩進度分流、遊戲難度門檻
-games/*.js       ← 9 個遊戲（memory, listen, fillblank, spelling, speak, bubble, echo, flashlight, detective）
+games/*.js       ← 11 個遊戲（memory, listen, fillblank, spelling, speak, bubble, echo, flashlight, detective, match, cloze）
 app.js           ← 全域狀態、頁面導航、單字/考試包管理、每日挑戰（舊版）、工具函式
 coins.js         ← 金幣庫、禮券、寶箱（覆蓋 app.js 的 renderCoinPage 等）
 patches.js       ← ⚠️ Monkey-patch 覆蓋層（最後載入，覆蓋前面的多個函式）
@@ -145,6 +145,15 @@ updateProgress(wordId, isCorrect, gameType, { mistakes, timeUsed, hintUsed });
 - `key: 'daily'` → 每日挑戰完成日期、連續天數
 - `key: 'dailyLevels'` → 每個小孩的程度設定
 - `key: 'currentChild'` → 上次選的小孩
+
+### 遊戲清單（11 個）
+- **match（連連看）**：英文↔中文配對，連對發音一次。需 ≥4 字，S 門檻 0。
+- **cloze（讀句選字）**：顯示挖空例句+朗讀，選正確單字（情境記憶）。需有例句，S 門檻 3。
+- 其餘 9 個見各 games/*.js。
+
+### 學習報告（patches.js 的 renderReport）
+- 頁面 `page-report`，依小孩顯示：單字總數、已學、今日待複習、各階段分布長條圖、需加強單字（lapses≥2）。
+- 純 CSS 長條圖，無圖表庫。
 
 ---
 

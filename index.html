@@ -41,12 +41,13 @@
       <button class="btn-manage" onclick="goTo('page-exams')">📝 考試複習包</button>
       <button class="btn-manage" onclick="startDailyChallenge()">🔥 每日挑戰</button>
       <button class="btn-manage" onclick="goTo('page-coins')">🪙 金幣庫</button>
+      <button class="btn-manage" onclick="goTo('page-report')">📊 學習報告</button>
       <div class="home-tools">
         <button class="home-tool-btn" onclick="appUpdate()">🔄 更新</button>
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion">v18</div>
+    <div class="app-version" id="appVersion">v19</div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -349,6 +350,21 @@
     </div>
   </div>
 
+  <!-- 學習報告 -->
+  <div id="page-report" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>📊 學習報告</h2>
+    </div>
+    <div class="manage-body">
+      <div class="report-tabs">
+        <button class="report-tab active" id="reportTabBoy" onclick="renderReport('boy')">👦 小男生</button>
+        <button class="report-tab" id="reportTabGirl" onclick="renderReport('girl')">👧 小女生</button>
+      </div>
+      <div id="reportBody"></div>
+    </div>
+  </div>
+
   <!-- 寶箱 modal -->
   <div id="modal-chest" class="modal" hidden>
     <div class="chest-modal">
@@ -416,11 +432,13 @@
   <script src="games/echo.js"></script>
   <script src="games/flashlight.js"></script>
   <script src="games/detective.js"></script>
+  <script src="games/match.js"></script>
+  <script src="games/cloze.js"></script>
   <script src="app.js"></script>
   <script src="coins.js"></script>
   <script src="patches.js"></script>
   <script>
-    var APP_VERSION = 'v18';
+    var APP_VERSION = 'v19';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號

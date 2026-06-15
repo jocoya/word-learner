@@ -13,6 +13,7 @@ function goTo(pageId) {
   if (pageId === 'page-manage') { renderWordList(); loadTagDropdown('tagDropdown'); }
   if (pageId === 'page-exams') renderExamList();
   if (pageId === 'page-coins') renderCoinPage();
+  if (pageId === 'page-report' && typeof renderReport === 'function') renderReport(currentChild || 'boy');
   if (pageId === 'page-games') {
     const srcEl = document.getElementById('gameSource');
     if (srcEl) srcEl.parentElement.style.display = '';
@@ -60,6 +61,8 @@ const GAMES = [
   { id: 'spelling',  icon: '🔤', name: '拼字挑戰',   desc: '拼出正確的單字',     modes: ['kid'] },
   { id: 'speak',     icon: '🎤', name: '看圖說句',   desc: '看圖說出句子',       modes: ['kid'] },
   { id: 'detective', icon: '🔍', name: '線索偵探',   desc: '聽線索猜單字',       modes: ['kid'] },
+  { id: 'match',     icon: '🔗', name: '連連看',     desc: '英文連中文',         modes: ['kid'] },
+  { id: 'cloze',     icon: '📖', name: '讀句選字',   desc: '讀句子選出單字',     modes: ['kid'] },
 ];
 
 function renderGameCards() {
