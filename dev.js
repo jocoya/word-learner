@@ -50,6 +50,7 @@ function openDevPanel() {
       '<div class="dev-btns">' +
         '<button class="dev-btn" onclick="devToggleMode()">' + (DEV_MODE ? '🔴 關閉測試模式' : '🟢 開啟測試模式') + '</button>' +
         '<button class="dev-btn dev-danger" onclick="devResetProgress()">♻️ 重置所有學習進度</button>' +
+        '<button class="dev-btn" onclick="devResetToday()">🔄 重置今日觸發（小怪物/每日挑戰）</button>' +
         '<button class="dev-btn" onclick="devSetStability()">🎚️ 設定單字熟練度（列表）</button>' +
         '<button class="dev-btn" onclick="devPreviewAnimations()">🎬 預覽動畫</button>' +
         '<button class="dev-btn" onclick="devAddCoins()">💰 增加金幣/鑽石（可選數量）</button>' +
@@ -89,7 +90,27 @@ async function devResetProgress() {
   devOut('✅ 已重置 ' + all.length + ' 筆學習進度。所有單字回到認識期。');
 }
 
-// 🎚️ 列出所有單字，直接點按鈕設定熟練度（目前小孩）
+// 🔄 重置今日觸發：清掉今天的小怪物 + 每日挑戰標記，讓它們能立刻再觸發
+async function devResetToday() {
+  var today = getTodayStr();
+  // 小怪物：清兩個小孩的 monsterDone
+  await dbPut('settings', { key: 'monsterDone-boy', value: '' });
+  await dbPut('settings', { key: 'monsterDone-girl', value: '' });
+  // 每日挑戰金幣：清今天的 coinEarned 標記 + 今日完成日期
+  var coins = await getCoins();
+  delete coins['coinEarned-boy-' + today];
+  delete coins['coinEarned-girl-' + today];
+  if (coins.lastStreakRewardDate === today) coins.lastStreakRewardDate = '';
+  await saveCoins(coins);
+  var daily = await getDailyData();
+  if (daily.completedDates) {
+    daily.completedDates = daily.completedDates.filter(function(d) {
+      return d !== 'boy-' + today && d !== 'girl-' + today;
+    });
+  }
+  await saveDailyData(daily);
+  devOut('✅ 已重置今日觸發。回首頁選小孩進模式 → 小怪物會再跳；每日挑戰金幣也可再領。');
+}
 async function devSetStability() {
   var words = await dbGetByIndex('words', 'pool', 'permanent');
   if (!words.length) { devOut('沒有單字'); return; }
