@@ -126,148 +126,166 @@ function initDetectiveGame(area, words) {
     };
   }
 
-  // ===== 偵探模式（熟字）：原本的猜謎玩法 =====
+  // ===== 偵探模式（熟字）：清爽單欄 + 漸進線索 + 語音/選擇兩種作答 =====
   function renderDetectiveMode(target) {
     var sentences = (target.sentences || []).slice();
+    var wordLen = target.word.replace(/\s/g, '').length;
+
+    // 線索清單（依序揭示）
     var clues = [];
-
-    // 線索 1：英英解釋。沒有就用「詞性 + 首字母 + 字數」智慧 fallback
+    // 線索 1：英英解釋（沒有就用詞性/反義詞提示）
     if (target.definition && target.definition.trim()) {
-      clues.push('📖 ' + target.definition);
+      clues.push({ icon: '📖', label: '英英解釋', text: target.definition });
     } else {
-      clues.push('🔤 ' + buildWordHint(target));
+      clues.push({ icon: '🔤', label: '提示', text: buildWordHint(target) });
     }
-
-    // 線索 2：例句（挖空答案）
+    // 線索 2：例句挖空
     var shuffledSen = shuffleArray(sentences);
-    var wordRegex = new RegExp('\\b' + target.word + '\\b', 'gi');
     if (shuffledSen.length >= 1) {
-      clues.push('💬 ' + shuffledSen[0].replace(wordRegex, '______'));
+      var wordRegex = new RegExp('\\b' + target.word + '\\b', 'gi');
+      clues.push({ icon: '💬', label: '例句', text: shuffledSen[0].replace(wordRegex, '＿＿＿') });
     }
 
-    // 線索 3：逐步揭示字母（首字母 + 字數骨架）
-    clues.push('✏️ ' + buildLetterSkeleton(target.word, 1));
+    // 干擾選項（給選擇題用）
+    var pool = (typeof withSentence !== 'undefined' ? withSentence : sentences);
+    var others = shuffleArray((words || []).filter(function(w){ return w.id !== target.id; })).slice(0, 3);
+    var choiceOptions = shuffleArray([target].concat(others));
 
-    // 線索 4：中文意思（最後才給）
-    clues.push('🀄 ' + target.meaning);
-
-    var clueIdx = 0;
-
-    // 底線提示：每個字母一個底線
-    var blanks = target.word.split('').map(function() { return '_'; }).join(' ');
+    var answered = false;
+    var clueShown = 1;          // 已顯示幾張線索卡
+    var letterReveal = 1;       // 骨架已揭示字母數（首字母先給）
+    var choicesShown = false;   // 是否已顯示選擇題
 
     area.innerHTML =
-      '<div class="det-scene">' +
-        '<img class="det-bg" src="./images/find.png" alt="">' +
-        '<div class="det-overlay-split">' +
-          '<div class="det-left">' +
-            '<div class="det-blanks" id="detBlanks">' + blanks + '</div>' +
-            '<div class="det-feedback" id="detFeedback"></div>' +
-          '</div>' +
-          '<div class="det-right">' +
-            '<div class="det-progress">' + (current+1) + ' / ' + total + '</div>' +
-            '<div class="det-cards" id="detCards">' +
-              clues.map(function(c, i) {
-                return '<div class="det-card" id="detCard' + i + '" style="opacity:' + (i === 0 ? '1' : '0') + ';transform:translateY(' + (i === 0 ? '0' : '-20px') + ')">' +
-                  '<div class="det-card-text">' + esc(c) + '</div>' +
-                '</div>';
-              }).join('') +
-            '</div>' +
-            '<div class="det-actions">' +
-              '<button class="det-clue-btn" id="detClueBtn" onclick="revealNextClue()">🔍 獲得線索</button>' +
-              (supported ? '<button class="det-answer-btn" id="detAnswerBtn" onclick="startDetAnswer()">🎙️ 講出答案</button>' : '') +
-              '<button class="det-skip-btn" onclick="skipDetective()">跳過 →</button>' +
-            '</div>' +
-          '</div>' +
+      '<div class="det2">' +
+        '<div class="det2-top">' +
+          '<span class="det2-progress">🔍 ' + (current+1) + ' / ' + total + '</span>' +
+          '<span class="det2-len">共 ' + wordLen + ' 個字母</span>' +
+        '</div>' +
+        '<div class="det2-skeleton" id="det2Skeleton">' + buildLetterSkeleton(target.word, 1) + '</div>' +
+        '<div class="det2-clues" id="det2Clues"></div>' +
+        '<div class="det2-feedback" id="det2Feedback"></div>' +
+        '<div class="det2-choices" id="det2Choices" hidden></div>' +
+        '<div class="det2-actions">' +
+          '<button class="det2-btn det2-clue" id="det2ClueBtn" onclick="detNextClue()">🔍 給我線索</button>' +
+          (supported ? '<button class="det2-btn det2-mic" id="det2MicBtn" onclick="detVoiceAnswer()">🎙️ 說答案</button>' : '') +
+          '<button class="det2-btn det2-skip" onclick="skipDetective()">跳過 →</button>' +
         '</div>' +
       '</div>';
 
-    clueIdx = 1;
-    var letterReveal = 1; // 底部骨架已揭示的字母數
+    var cluesEl = document.getElementById('det2Clues');
+    // 先顯示第一張線索卡
+    function appendClue(c) {
+      var div = document.createElement('div');
+      div.className = 'det2-card';
+      div.innerHTML = '<span class="det2-card-icon">' + c.icon + '</span>' +
+        '<span class="det2-card-body"><b>' + esc(c.label) + '</b><br>' + esc(c.text) + '</span>';
+      cluesEl.appendChild(div);
+      setTimeout(function(){ div.classList.add('show'); }, 30);
+    }
+    appendClue(clues[0]);
 
-    window.revealNextClue = function() {
-      // 階段一：逐張揭示線索卡
-      if (clueIdx < clues.length) {
-        for (var i = 0; i < clueIdx; i++) {
-          var prev = document.getElementById('detCard' + i);
-          if (prev) prev.style.opacity = '0.4';
-        }
-        var card = document.getElementById('detCard' + clueIdx);
-        if (card) {
-          card.style.transition = 'opacity 0.5s, transform 0.5s';
-          card.style.opacity = '1';
-          card.style.transform = 'translateY(0)';
-        }
-        clueIdx++;
-        // 線索看完後，按鈕轉成「再給一個字母」
-        if (clueIdx >= clues.length) {
-          var btn = document.getElementById('detClueBtn');
-          if (btn) btn.textContent = '🔡 再給一個字母';
+    // 「給我線索」：依序 揭示線索卡 → 逐字母 → 最後給選擇題
+    window.detNextClue = function() {
+      if (answered) return;
+      // 階段一：還有線索卡沒揭示
+      if (clueShown < clues.length) {
+        appendClue(clues[clueShown]);
+        clueShown++;
+        return;
+      }
+      // 階段二：逐字母揭示
+      if (letterReveal < wordLen) {
+        letterReveal++;
+        document.getElementById('det2Skeleton').innerHTML = buildLetterSkeleton(target.word, letterReveal);
+        // 字母揭示到一半後，提示可以用選擇題
+        if (letterReveal >= Math.ceil(wordLen / 2) && !choicesShown) {
+          var btn = document.getElementById('det2ClueBtn');
+          if (btn) btn.textContent = '🎯 給我選項';
         }
         return;
       }
-      // 階段二：逐步在底部骨架揭示字母
-      var wordLen = target.word.replace(/\s/g, '').length;
-      if (letterReveal < wordLen) {
-        letterReveal++;
-        document.getElementById('detBlanks').innerHTML = buildLetterSkeleton(target.word, letterReveal);
-        if (letterReveal >= wordLen) {
-          var b = document.getElementById('detClueBtn');
-          if (b) b.style.display = 'none';
-        }
-      }
+      // 階段三：給選擇題（最後線索）
+      if (!choicesShown) showChoices();
     };
 
-    var recognition = null, answered = false;
+    function showChoices() {
+      choicesShown = true;
+      var box = document.getElementById('det2Choices');
+      box.hidden = false;
+      box.innerHTML = choiceOptions.map(function(o) {
+        return '<button class="det2-choice" data-id="' + o.id + '">' + esc(o.word) + '</button>';
+      }).join('');
+      box.querySelectorAll('.det2-choice').forEach(function(b) {
+        b.addEventListener('click', function() {
+          if (answered) return;
+          var ok = parseInt(b.dataset.id) === target.id;
+          b.classList.add(ok ? 'correct' : 'wrong');
+          if (ok) win(0); else {
+            var r = box.querySelector('.det2-choice[data-id="' + target.id + '"]');
+            if (r) r.classList.add('correct');
+            lose();
+          }
+        });
+      });
+      var btn = document.getElementById('det2ClueBtn');
+      if (btn) btn.style.display = 'none';
+    }
 
-    window.startDetAnswer = function() {
+    // 語音作答
+    var recognition = null;
+    window.detVoiceAnswer = function() {
       if (answered) return;
       if (recognition) { recognition.stop(); return; }
       var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SR();
       recognition.lang = 'en-US'; recognition.interimResults = false; recognition.maxAlternatives = 5;
-      var btn = document.getElementById('detAnswerBtn');
-      btn.textContent = '🔴 聽你說...'; btn.classList.add('recording');
-
+      var mic = document.getElementById('det2MicBtn');
+      mic.textContent = '🔴 聽你說...'; mic.classList.add('recording');
       recognition.onresult = function(e) {
         var found = false, best = '';
         for (var i = 0; i < e.results[0].length; i++) {
           var t = e.results[0][i].transcript.toLowerCase();
           if (!best) best = e.results[0][i].transcript;
-          if (t.indexOf(target.word.toLowerCase()) !== -1) { found = true; best = e.results[0][i].transcript; break; }
+          if (t.indexOf(target.word.toLowerCase()) !== -1) { found = true; break; }
         }
-        btn.textContent = '🎙️ 講出答案'; btn.classList.remove('recording');
-        recognition = null;
-
-        if (found) {
-          answered = true; correct++;
-          speakWord(target.word, 0.7);
-          updateProgress(target.id, true, 'detective', { mistakes: 0 });
-          document.getElementById('gameScore').textContent = correct + ' / ' + (current+1);
-          // 底線變成答案
-          document.getElementById('detBlanks').innerHTML = '<span class="det-answer-word">' + esc(target.word) + '</span>';
-          // 金色爆發
-          document.querySelectorAll('.det-card').forEach(function(c) {
-            c.style.opacity = '1'; c.classList.add('det-glow');
-          });
-          setTimeout(function() { current++; renderRound(); }, 2500);
-        } else {
-          document.getElementById('detFeedback').innerHTML = '<span style="color:#FF9800;">你說了「' + esc(best) + '」</span>';
-        }
+        mic.textContent = '🎙️ 說答案'; mic.classList.remove('recording'); recognition = null;
+        if (found) win(0);
+        else document.getElementById('det2Feedback').innerHTML = '<span class="det2-try">你說了「' + esc(best) + '」，再試試？</span>';
       };
-      recognition.onerror = function() {
-        btn.textContent = '🎙️ 講出答案'; btn.classList.remove('recording'); recognition = null;
-        document.getElementById('detFeedback').textContent = '聽不清楚，再試一次？';
-      };
-      recognition.onend = function() { btn.textContent = '🎙️ 講出答案'; btn.classList.remove('recording'); recognition = null; };
+      recognition.onerror = function() { mic.textContent = '🎙️ 說答案'; mic.classList.remove('recording'); recognition = null; };
+      recognition.onend = function() { mic.textContent = '🎙️ 說答案'; mic.classList.remove('recording'); recognition = null; };
       recognition.start();
     };
 
+    function win(mistakes) {
+      if (answered) return;
+      answered = true;
+      correct++;
+      speakWord(target.word, 0.7);
+      updateProgress(target.id, true, 'detective', { mistakes: mistakes });
+      document.getElementById('gameScore').textContent = correct + ' / ' + (current+1);
+      document.getElementById('det2Skeleton').innerHTML = '<span class="det2-answer">' + esc(target.word) + '</span>';
+      document.getElementById('det2Feedback').innerHTML = '<span class="det2-win">🎉 答對了！</span>';
+      setTimeout(function() { current++; renderRound(); }, 2200);
+    }
+    function lose() {
+      if (answered) return;
+      answered = true;
+      speakWord(target.word, 0.7);
+      updateProgress(target.id, false, 'detective', { mistakes: 2 });
+      document.getElementById('det2Skeleton').innerHTML = '<span class="det2-answer">' + esc(target.word) + '</span>';
+      document.getElementById('det2Feedback').innerHTML = '<span class="det2-try">正確答案：' + esc(target.word) + '</span>';
+      setTimeout(function() { current++; renderRound(); }, 2200);
+    }
+
     window.skipDetective = function() {
+      if (answered) return;
+      answered = true;
       updateProgress(target.id, false, 'detective', { mistakes: 2 });
       speakWord(target.word, 0.7);
-      document.getElementById('detBlanks').innerHTML = '<span class="det-answer-word">' + esc(target.word) + '</span>';
-      setTimeout(function() { current++; renderRound(); }, 2000);
+      document.getElementById('det2Skeleton').innerHTML = '<span class="det2-answer">' + esc(target.word) + '</span>';
+      setTimeout(function() { current++; renderRound(); }, 1500);
     };
   }
   buildQueueAndStart();
