@@ -27,6 +27,7 @@
 firebase SDK (CDN)
 db.js            ← Firebase 初始化、IndexedDB CRUD、舊版 SM-2 演算法、getDueWords
 fsrs-engine.js   ← FSRS 演算法、多小孩進度分流、遊戲難度門檻
+ai.js            ← AI 統一介面 aiChat()（可切換 Ollama / LM Studio / 自訂後端）+ AI 設定面板
 games/*.js       ← 11 個遊戲（memory, listen, fillblank, spelling, speak, bubble, echo, flashlight, detective, match, cloze）
 app.js           ← 全域狀態、頁面導航、單字/考試包管理、每日挑戰（舊版）、工具函式
 coins.js         ← 金幣庫、禮券、寶箱（覆蓋 app.js 的 renderCoinPage 等）
@@ -161,9 +162,16 @@ updateProgress(wordId, isCorrect, gameType, { mistakes, timeUsed, hintUsed });
 - 首頁版本號連點 5 下開啟。`DEV_MODE` 為 true 時：`updateProgress` 與每日獎勵都跳過（`devSkipRewards()`）。
 - 工具：重置進度、手動設 stability、預覽動畫、加測試金幣、測試語音、資料檢視、快速模式。
 
+### AI 文字生成（ai.js）
+- 統一介面 `aiChat(prompt, options)`，底層可切換 Ollama（/api/generate）/ LM Studio（OpenAI 相容 /v1/chat/completions）/ 自訂。
+- 設定存 settings 的 `aiConfig`，由「⚙️ AI 設定」面板（管理頁）調整，可測試連線。
+- `ollamaGenerate` 保留為相容包裝（→ aiChat）。
+- 一鍵生成全部 `aiGenerateAll(prefix)`：一次生 中文意思+詞性+英英解釋+3 例句（用 JSON 回傳，`parseAIJson` 容錯解析）。
+- 未來接 agent / 雲端只要在 ai.js 加 provider，上層不用改。
+
 ### 每日小怪物（monster.js）
-- `setChild` 觸發 `maybeShowDailyMonster`，每天每個小孩第一次選時跳。
-- 用 `lastMonsterDate-{child}` 記錄（settings），男女分開計算。
+- `setChild`→`enterMode` 觸發 `maybeShowDailyMonster`，每天每個小孩第一次進模式時跳。
+- 用 `monsterDone-{child}` 記錄（settings），男女分開計算；只在「打敗」時標記，「等一下」不標記。
 - 智慧選字：優先 due 字，否則全新字。打敗它 = 玩一場單字版遊戲（依 stability 選 listen/spelling/cloze）。
 - 怪物用 emoji + CSS 動畫，無需圖片素材。
 
@@ -171,10 +179,14 @@ updateProgress(wordId, isCorrect, gameType, { mistakes, timeUsed, hintUsed });
 
 ## 待辦 / 規劃中（依討論順序）
 
-1. **離線快取強化**：Storage 圖片/音檔改「快取優先」、首頁「清除快取」按鈕（顯示用量）、「更新」按鈕、右下角版本號。
-2. **TTS 語音**：用「TTS 供應商介面」抽象化 → 先接 Google Cloud TTS（預生成存 Storage、存 URL）→ 未來可切換本地 Piper/CosyVoice。`speakWord` 改為「有音檔播音檔、無則 fallback 內建 speechSynthesis」。
-3. **Google 登入**：取代脆弱的匿名登入，用 `linkWithCredential` 把匿名帳號升級成 Google 帳號（保留現有資料）。做之前務必先匯出 JSON 備份。
-4. **匯出強化**：目前 `exportAllData` 只匯出 words/exams/progress，**未含 coins/settings**，應補上讓備份完整。
+1. **多 sense 結構（多義詞）**：一個單字多個詞義（meaning/pos/sentences/images 各自一份），FSRS 進度算整個單字。用於多義詞 + 靠例句理解詞義。（待確認後做）
+2. **「認識新字」模式**：先例句後單字的學習入口，一次 5-8 個新字。（待確認後做）
+3. **本地生圖**：用例句當 prompt 生「場景圖」，接 ComfyUI / SD Forge API（使用者 ComfyUI 尚未設定完）。
+4. **TTS 語音**：用「供應商介面」→ Google Cloud TTS 預生成存 Storage。
+5. **本地照片上傳 Storage**：若實測「清快取後照片消失」才做。
+6. **Google 登入**：使用者決定先不做，改用離線 + JSON 備份。
+
+（已完成：匯出含 coins/settings、離線快取、開發者模式、每日小怪物、連連看/讀句選字、AI 統一介面+一鍵生成）
 
 ---
 

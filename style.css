@@ -1687,3 +1687,58 @@ body {
   flex: 1; padding: 10px; font-size: 1em;
   border: 2px solid #ddd; border-radius: 8px;
 }
+
+
+/* ===== 一鍵生成全部按鈕 ===== */
+.btn-genall {
+  flex: 1;
+  padding: 14px;
+  font-size: 1.05em;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #7E57C2, #4A90D9);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(126,87,194,0.35);
+}
+.btn-genall:active { transform: scale(0.98); }
+.btn-genall:disabled { opacity: 0.6; }
+.add-word-head { display: flex; align-items: center; justify-content: space-between; }
+
+/* ===== AI 設定面板 ===== */
+.ai-settings { max-width: 440px; }
+.ai-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.ai-row label { width: 110px; font-weight: 600; color: #555; flex-shrink: 0; font-size: 0.9em; }
+.ai-row select, .ai-row input {
+  flex: 1; padding: 10px; font-size: 1em;
+  border: 2px solid #ddd; border-radius: 8px;
+}
+.ai-output {
+  margin-top: 10px; padding: 10px; border-radius: 8px;
+  background: #f5f5f5; font-size: 0.9em; min-height: 20px; word-break: break-all;
+}
+
+
+/* ===== AI 批次工具 ===== */
+.batch-tools {
+  background: #F3E5F5; border-radius: 14px;
+  padding: 14px; margin: 16px 0;
+}
+.batch-tools h3 { margin-bottom: 10px; color: #6A1B9A; font-size: 1.05em; }
+.batch-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.batch-btns .btn-sm { flex: 1; min-width: 140px; }
+.batch-progress {
+  margin-top: 10px; font-size: 0.9em; color: #555;
+  min-height: 18px;
+}
+.bulk-import-box {
+  background: #E3F2FD; border-radius: 14px;
+  padding: 14px; margin: 12px 0;
+}
+.bulk-import-box h4 { margin-bottom: 8px; color: #1565C0; }
+.bulk-import-box textarea {
+  width: 100%; padding: 10px; font-size: 1em;
+  border: 2px solid #90CAF9; border-radius: 8px;
+  font-family: monospace; resize: vertical;
+}

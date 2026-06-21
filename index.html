@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>英文單字學習樂園</title>
-  <link rel="stylesheet" href="style.css?v=27" />
+  <link rel="stylesheet" href="style.css?v=29" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#4A90D9" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -47,7 +47,7 @@
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v27</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v29</div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -80,10 +80,16 @@
     </div>
     <div class="manage-body">
       <div class="add-word-form">
-        <h3>新增單字</h3>
+        <div class="add-word-head">
+          <h3>新增單字</h3>
+          <button class="btn-sm" onclick="openAISettings()">⚙️ AI 設定</button>
+        </div>
         <div class="form-row">
           <input id="newWord" type="text" placeholder="英文單字" />
           <input id="newMeaning" type="text" placeholder="中文意思" />
+        </div>
+        <div class="form-row">
+          <button id="aiGenAllBtn_new" class="btn-genall" onclick="aiGenerateAll('new')">🤖 一鍵生成全部（意思+詞性+解釋+例句）</button>
         </div>
         <div class="form-row">
           <select id="newPos">
@@ -150,6 +156,29 @@
         <div id="imagePreview" class="image-preview" hidden></div>
         <button class="btn-primary" onclick="addWord()">新增</button>
       </div>
+
+      <!-- AI 批次工具 -->
+      <div class="batch-tools">
+        <h3>🤖 AI 批次工具</h3>
+        <div class="batch-btns">
+          <button class="btn-sm" onclick="batchFillSentences()">📝 批次補例句（缺例句的字）</button>
+          <button class="btn-sm" onclick="batchFillMeaning()">🀄 批次補中文意思</button>
+          <button class="btn-sm" onclick="batchFillPos()">🔤 批次判斷詞性</button>
+          <button class="btn-sm" onclick="openBulkImport()">📥 整批匯入單字</button>
+        </div>
+        <div class="batch-progress" id="batchProgress"></div>
+      </div>
+
+      <!-- 整批匯入對話框（內嵌） -->
+      <div id="bulkImportBox" class="bulk-import-box" hidden>
+        <h4>整批匯入（一行一個英文單字，AI 會自動補齊資料）</h4>
+        <textarea id="bulkImportText" rows="8" placeholder="apple&#10;banana&#10;run&#10;happy&#10;..."></textarea>
+        <div class="batch-btns">
+          <button class="btn-primary" onclick="runBulkImport()">🚀 開始匯入</button>
+          <button class="btn-ghost" onclick="document.getElementById('bulkImportBox').hidden=true">取消</button>
+        </div>
+        <div class="batch-progress" id="bulkProgress"></div>
+      </div>
       <div class="word-list-header">
         <h3>單字列表 <span id="wordCount" style="color:#999;font-weight:400;font-size:.85em;"></span></h3>
         <input id="wordSearch" type="text" placeholder="搜尋..." oninput="renderWordList()" />
@@ -213,6 +242,9 @@
         <div class="form-row">
           <input id="examNewWord" type="text" placeholder="英文單字" />
           <input id="examNewMeaning" type="text" placeholder="中文意思" />
+        </div>
+        <div class="form-row">
+          <button id="aiGenAllBtn_exam" class="btn-genall" onclick="aiGenerateAll('exam')">🤖 一鍵生成全部（意思+詞性+解釋+例句）</button>
         </div>
         <div class="form-row">
           <select id="examNewPos">
@@ -421,26 +453,27 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="db.js?v=27"></script>
-  <script src="fsrs-engine.js?v=27"></script>
-  <script src="games/memory.js?v=27"></script>
-  <script src="games/listen.js?v=27"></script>
-  <script src="games/fillblank.js?v=27"></script>
-  <script src="games/spelling.js?v=27"></script>
-  <script src="games/speak.js?v=27"></script>
-  <script src="games/bubble.js?v=27"></script>
-  <script src="games/echo.js?v=27"></script>
-  <script src="games/flashlight.js?v=27"></script>
-  <script src="games/detective.js?v=27"></script>
-  <script src="games/match.js?v=27"></script>
-  <script src="games/cloze.js?v=27"></script>
-  <script src="app.js?v=27"></script>
-  <script src="coins.js?v=27"></script>
-  <script src="dev.js?v=27"></script>
-  <script src="patches.js?v=27"></script>
-  <script src="monster.js?v=27"></script>
+  <script src="db.js?v=29"></script>
+  <script src="fsrs-engine.js?v=29"></script>
+  <script src="ai.js?v=29"></script>
+  <script src="games/memory.js?v=29"></script>
+  <script src="games/listen.js?v=29"></script>
+  <script src="games/fillblank.js?v=29"></script>
+  <script src="games/spelling.js?v=29"></script>
+  <script src="games/speak.js?v=29"></script>
+  <script src="games/bubble.js?v=29"></script>
+  <script src="games/echo.js?v=29"></script>
+  <script src="games/flashlight.js?v=29"></script>
+  <script src="games/detective.js?v=29"></script>
+  <script src="games/match.js?v=29"></script>
+  <script src="games/cloze.js?v=29"></script>
+  <script src="app.js?v=29"></script>
+  <script src="coins.js?v=29"></script>
+  <script src="dev.js?v=29"></script>
+  <script src="patches.js?v=29"></script>
+  <script src="monster.js?v=29"></script>
   <script>
-    var APP_VERSION = 'v27';
+    var APP_VERSION = 'v29';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號

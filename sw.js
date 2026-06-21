@@ -1,12 +1,13 @@
-const CACHE = 'word-learner-v27';
+const CACHE = 'word-learner-v29';
 const MEDIA_CACHE = 'word-learner-media'; // 圖片/音檔（跨版本保留，不隨程式更新清掉）
-const V = '?v=27';
+const V = '?v=29';
 const ASSETS = [
   './index.html',
   './style.css' + V,
   './app.js' + V,
   './db.js' + V,
   './fsrs-engine.js' + V,
+  './ai.js' + V,
   './coins.js' + V,
   './patches.js' + V,
   './dev.js' + V,

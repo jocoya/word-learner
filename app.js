@@ -256,22 +256,11 @@ async function updateProgress(wordId, correct) {
   await dbPut('progress', p);
 }
 
-// ===== 本地 AI（Ollama）英英解釋 + 例句生成 =====
-// 電腦上用 localhost，平板/手機透過 Tailscale 用固定 IP
-const OLLAMA_HOST = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-  ? 'http://localhost:11434'
-  : 'http://100.125.96.108:11434';
-const OLLAMA_URL = OLLAMA_HOST + '/api/generate';
-const OLLAMA_MODEL = 'bjoernb/gemma4-e4b-fast';
-
+// ===== 本地 AI 文字生成 =====
+// 底層統一走 ai.js 的 aiChat()，可切換 Ollama / LM Studio / 自訂後端。
+// 保留 ollamaGenerate 名稱當相容包裝。
 async function ollamaGenerate(prompt) {
-  var res = await fetch(OLLAMA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: OLLAMA_MODEL, prompt: prompt, stream: false })
-  });
-  var data = await res.json();
-  return (data.response || '').trim();
+  return await aiChat(prompt, { temperature: 0.7 });
 }
 
 async function aiGenerateDefinition(wordInputId, defInputId) {
@@ -342,7 +331,75 @@ async function aiGenerateSentence(wordInputId, sentenceInputId) {
   }
 }
 
-// ===== 圖片搜尋 =====
+// ===== 一鍵生成全部（中文意思 + 詞性 + 英英解釋 + 3 例句）=====
+// prefix: 'new'（新增頁）或 'edit'（編輯頁）
+async function aiGenerateAll(prefix) {
+  prefix = prefix || 'new';
+  var wordEl = document.getElementById(prefix === 'edit' ? 'editWord' : (prefix === 'exam' ? 'examNewWord' : 'newWord'));
+  var word = wordEl ? wordEl.value.trim() : '';
+  if (!word) return alert('請先輸入英文單字');
+
+  var btn = document.getElementById('aiGenAllBtn_' + prefix);
+  var origText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '🤖 生成中...'; }
+
+  // 欄位 id 對照
+  var ids = {
+    meaning: prefix === 'edit' ? 'editMeaning' : (prefix === 'exam' ? 'examNewMeaning' : 'newMeaning'),
+    pos:     prefix === 'edit' ? 'editPos'     : (prefix === 'exam' ? 'examNewPos'     : 'newPos'),
+    def:     prefix === 'edit' ? 'editDefinition' : (prefix === 'exam' ? 'examNewDefinition' : 'newDefinition'),
+    s1:      prefix === 'edit' ? 'editSentence1' : (prefix === 'exam' ? 'examNewSentence1' : 'newSentence1'),
+    s2:      prefix === 'edit' ? 'editSentence2' : (prefix === 'exam' ? 'examNewSentence2' : 'newSentence2'),
+    s3:      prefix === 'edit' ? 'editSentence3' : (prefix === 'exam' ? 'examNewSentence3' : 'newSentence3')
+  };
+
+  try {
+    var prompt =
+      "You are helping build a children's English vocabulary card for the word \"" + word + "\".\n" +
+      "Return ONLY valid JSON (no markdown, no extra text) with this exact shape:\n" +
+      '{"meaning":"繁體中文意思","pos":"noun|verb|adj|adv|prep|other","definition":"a very simple English explanation a 4-year-old understands, one short sentence","sentences":["sentence 1","sentence 2","sentence 3"]}\n' +
+      "Rules:\n" +
+      "- meaning: 用繁體中文，最常見的意思\n" +
+      "- pos: pick ONE part of speech\n" +
+      "- definition: very simple English, one short sentence\n" +
+      "- sentences: 3 DIFFERENT real-world sentences for a 4-8 year old, each under 10 words, must contain the word \"" + word + "\", no fantasy, no talking animals\n" +
+      "Word: " + word;
+
+    var raw = await aiChat(prompt, { temperature: 0.6, maxTokens: 400 });
+    var data = parseAIJson(raw);
+    if (!data) throw new Error('AI 回傳格式無法解析');
+
+    function setVal(id, val) { var el = document.getElementById(id); if (el && val) el.value = val; }
+    setVal(ids.meaning, data.meaning);
+    if (data.pos) { var pe = document.getElementById(ids.pos); if (pe) pe.value = data.pos; }
+    setVal(ids.def, data.definition);
+    if (Array.isArray(data.sentences)) {
+      setVal(ids.s1, data.sentences[0]);
+      setVal(ids.s2, data.sentences[1]);
+      setVal(ids.s3, data.sentences[2]);
+    }
+    if (btn) { btn.textContent = '✅ 完成！'; setTimeout(function(){ btn.textContent = origText; btn.disabled = false; }, 1500); }
+  } catch (e) {
+    alert('一鍵生成失敗：' + e.message + '\n（請確認 AI 後端有在執行，可到 AI 設定測試連線）');
+    if (btn) { btn.textContent = origText; btn.disabled = false; }
+  }
+}
+
+// 從 AI 回傳文字中抽出 JSON（容錯：去掉 markdown 圍欄、找第一個 { 到最後一個 }）
+function parseAIJson(raw) {
+  if (!raw) return null;
+  var txt = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+  var start = txt.indexOf('{');
+  var end = txt.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+  try {
+    return JSON.parse(txt.slice(start, end + 1));
+  } catch (e) {
+    return null;
+  }
+}
+
+
 const PIXABAY_KEY = '55343360-32689ce0eb7144b69e7844579';
 let currentImageTarget = null;
 
@@ -610,6 +667,9 @@ async function editWord(id) {
       <div class="form-row">
         <input id="editWord" type="text" placeholder="英文單字" value="${esc(w.word)}" />
         <input id="editMeaning" type="text" placeholder="中文意思" value="${esc(w.meaning)}" />
+      </div>
+      <div class="form-row">
+        <button id="aiGenAllBtn_edit" class="btn-genall" onclick="aiGenerateAll('edit')">🤖 一鍵生成全部</button>
       </div>
       <div class="form-row">
         <select id="editPos">
