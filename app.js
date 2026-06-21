@@ -88,6 +88,39 @@ function renderGameCards() {
       <div class="game-card-name">${g.name}</div>
       <div class="game-card-desc">${g.desc}</div>
     </button>`).join('');
+  // 更新「認識新字」誘因橫幅（依目前小孩，只在挑戰模式顯示）
+  if (typeof updateNewWordBanner === 'function') updateNewWordBanner();
+}
+
+// 計算目前小孩「還沒學過（reps=0）」的字數，顯示誘因橫幅
+async function updateNewWordBanner() {
+  var banner = document.getElementById('newwordBanner');
+  if (!banner) return;
+  if (currentMode !== 'kid') { banner.hidden = true; return; }
+  var words = await dbGetByIndex('words', 'pool', 'permanent');
+  // 只算有例句的新字（線索偵探學習模式需要例句）
+  var newCount = 0;
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i];
+    if (!w.sentences || !w.sentences.some(function(s){ return s && s.trim(); })) continue;
+    var p = (typeof getProgressFor === 'function') ? await getProgressFor(w.id) : null;
+    if (!p) { newCount++; continue; }
+    p = (typeof fsrsUpgrade === 'function') ? fsrsUpgrade(p) : p;
+    if (!p.reps || p.reps === 0) newCount++;
+  }
+  if (newCount <= 0) {
+    banner.innerHTML = '<div class="newword-done">🎉 太棒了！目前的新字都認識了</div>';
+    banner.hidden = false;
+    return;
+  }
+  var who = currentChild === 'boy' ? '👦' : '👧';
+  banner.innerHTML =
+    '<button class="newword-cta" onclick="startGame(\'detective\')">' +
+      '<span class="newword-cta-icon">📖</span>' +
+      '<span class="newword-cta-text">' + who + ' 還有 <b>' + newCount + '</b> 個新字等你認識！</span>' +
+      '<span class="newword-cta-go">去學 →</span>' +
+    '</button>';
+  banner.hidden = false;
 }
 
 async function getGameWords() {

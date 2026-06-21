@@ -1776,3 +1776,30 @@ body {
   .learn-sentence { font-size: 2em; }
   .learn-img { max-width: 340px; max-height: 280px; }
 }
+
+
+/* ===== 認識新字誘因橫幅 ===== */
+.newword-banner { padding: 0 16px; margin-bottom: 8px; }
+.newword-cta {
+  width: 100%;
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #FFD54F, #FF9800);
+  border: none; border-radius: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255,152,0,0.4);
+  animation: newwordPulse 2s ease infinite;
+}
+@keyframes newwordPulse {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+.newword-cta-icon { font-size: 2em; }
+.newword-cta-text { flex: 1; text-align: left; font-size: 1.15em; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.newword-cta-text b { font-size: 1.3em; }
+.newword-cta-go { font-size: 1.1em; font-weight: 800; color: #fff; }
+.newword-done {
+  text-align: center; padding: 12px;
+  background: #E8F5E9; color: #43A047; font-weight: 600;
+  border-radius: 12px;
+}
