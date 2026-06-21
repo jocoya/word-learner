@@ -39,8 +39,35 @@ function initDetectiveGame(area, words) {
     return;
   }
   var total = Math.min(8, withSentence.length);
-  var queue = shuffleArray(withSentence).slice(0, total);
+
+  // 建立佇列：若從「認識新字」入口進來，優先排新字（S=0）
+  var learnFirst = (typeof window !== 'undefined' && window.detectiveLearnFirst);
+  window.detectiveLearnFirst = false; // 用完即清
+
   var current = 0, correct = 0;
+  var queue;
+
+  function buildQueueAndStart() {
+    if (learnFirst) {
+      // 依 stability 把新字排前面
+      var enriched = [];
+      var pending = withSentence.length;
+      withSentence.forEach(function(w) {
+        getWordStability(w.id).then(function(s) {
+          enriched.push({ w: w, s: s });
+          if (--pending === 0) {
+            var news = shuffleArray(enriched.filter(function(x){ return !x.s || x.s <= 0; }));
+            var olds = shuffleArray(enriched.filter(function(x){ return x.s > 0; }));
+            queue = news.concat(olds).slice(0, total).map(function(x){ return x.w; });
+            renderRound();
+          }
+        });
+      });
+    } else {
+      queue = shuffleArray(withSentence).slice(0, total);
+      renderRound();
+    }
+  }
 
   function renderRound() {
     if (current >= queue.length) { showResult(correct, total); return; }
@@ -243,5 +270,5 @@ function initDetectiveGame(area, words) {
       setTimeout(function() { current++; renderRound(); }, 2000);
     };
   }
-  renderRound();
+  buildQueueAndStart();
 }

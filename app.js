@@ -115,12 +115,18 @@ async function updateNewWordBanner() {
   }
   var who = currentChild === 'boy' ? '👦' : '👧';
   banner.innerHTML =
-    '<button class="newword-cta" onclick="startGame(\'detective\')">' +
+    '<button class="newword-cta" onclick="startLearnNewWords()">' +
       '<span class="newword-cta-icon">📖</span>' +
       '<span class="newword-cta-text">' + who + ' 還有 <b>' + newCount + '</b> 個新字等你認識！</span>' +
       '<span class="newword-cta-go">去學 →</span>' +
     '</button>';
   banner.hidden = false;
+}
+
+// 從誘因橫幅進入：優先排新字的線索偵探（學習模式）
+function startLearnNewWords() {
+  window.detectiveLearnFirst = true;
+  startGame('detective');
 }
 
 async function getGameWords() {
