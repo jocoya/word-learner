@@ -54,11 +54,39 @@ async function aiChat(prompt, options) {
   return await _openAIChat(url, model, prompt, options);
 }
 
+// 帶 timeout 的 fetch（避免連不上時卡死）
+async function fetchWithTimeout(url, opts, timeoutMs) {
+  timeoutMs = timeoutMs || 30000;
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  try {
+    var res = await fetch(url, Object.assign({}, opts, { signal: controller.signal }));
+    clearTimeout(timer);
+    return res;
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') {
+      throw new Error('連線逾時（' + (timeoutMs/1000) + '秒）— 請確認 AI 後端有開啟且網路可連');
+    }
+    // 連不上 / CORS / mixed-content 通常是 TypeError: Failed to fetch
+    if (e instanceof TypeError) {
+      var hint = '';
+      if (location.protocol === 'https:' && url.indexOf('http:') === 0) {
+        hint = '\n⚠️ 你的網頁是 HTTPS，但 AI 後端是 HTTP，瀏覽器會封鎖（mixed content）。請用 HTTPS 存取後端，或在電腦本機(localhost)使用。';
+      } else {
+        hint = '\n可能原因：後端沒開、位址錯誤、或 CORS 未允許（LM Studio 需開啟 CORS）。';
+      }
+      throw new Error('無法連線到 AI 後端' + hint);
+    }
+    throw e;
+  }
+}
+
 // Ollama 原生 /api/generate
 async function _ollamaChat(cfg, prompt, options) {
   var url = localizeHost(cfg.ollamaHost) + '/api/generate';
   var fullPrompt = options.system ? (options.system + '\n\n' + prompt) : prompt;
-  var res = await fetch(url, {
+  var res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -67,8 +95,11 @@ async function _ollamaChat(cfg, prompt, options) {
       stream: false,
       options: { temperature: options.temperature != null ? options.temperature : 0.7 }
     })
-  });
-  if (!res.ok) throw new Error('Ollama HTTP ' + res.status);
+  }, options.timeout || 60000);
+  if (!res.ok) {
+    var t = await res.text().catch(function(){ return ''; });
+    throw new Error('Ollama HTTP ' + res.status + (t ? ' — ' + t.slice(0, 120) : ''));
+  }
   var data = await res.json();
   return (data.response || '').trim();
 }
@@ -79,7 +110,7 @@ async function _openAIChat(url, model, prompt, options) {
   var messages = [];
   if (options.system) messages.push({ role: 'system', content: options.system });
   messages.push({ role: 'user', content: prompt });
-  var res = await fetch(url, {
+  var res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -89,16 +120,19 @@ async function _openAIChat(url, model, prompt, options) {
       max_tokens: options.maxTokens || 512,
       stream: false
     })
-  });
-  if (!res.ok) throw new Error('AI HTTP ' + res.status);
+  }, options.timeout || 60000);
+  if (!res.ok) {
+    var tt = await res.text().catch(function(){ return ''; });
+    throw new Error('AI HTTP ' + res.status + (tt ? ' — ' + tt.slice(0, 120) : ''));
+  }
   var data = await res.json();
   return ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
 }
 
-// 測試目前後端是否連得上
+// 測試目前後端是否連得上（短 timeout）
 async function aiTestConnection() {
   try {
-    var r = await aiChat('Say OK', { maxTokens: 10, temperature: 0 });
+    var r = await aiChat('Say OK', { maxTokens: 10, temperature: 0, timeout: 15000 });
     return { ok: true, reply: r };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -132,6 +166,7 @@ async function openAISettings() {
       '<div class="ai-fields" id="aiFieldsLmstudio">' +
         '<div class="ai-row"><label>LM Studio 位址</label><input id="aiLmHost" value="' + esc(cfg.lmstudioHost) + '"></div>' +
         '<div class="ai-row"><label>模型</label><input id="aiLmModel" value="' + esc(cfg.lmstudioModel) + '"></div>' +
+        '<div class="ai-hint">⚠️ LM Studio 需在「Developer」分頁 <b>Start Server</b>，並開啟 <b>CORS</b> 與 <b>Serve on Local Network</b>（才能讓平板連）。位址用電腦的 Tailscale IP:1234，不要加 /v1。</div>' +
       '</div>' +
       '<div class="ai-fields" id="aiFieldsCustom">' +
         '<div class="ai-row"><label>Endpoint URL</label><input id="aiCustomUrl" value="' + esc(cfg.customUrl) + '" placeholder="http://.../v1/chat/completions"></div>' +

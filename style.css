@@ -1717,6 +1717,12 @@ body {
 .ai-output {
   margin-top: 10px; padding: 10px; border-radius: 8px;
   background: #f5f5f5; font-size: 0.9em; min-height: 20px; word-break: break-all;
+  white-space: pre-wrap;
+}
+.ai-hint {
+  margin-top: 6px; padding: 10px;
+  background: #FFF8E1; border-left: 3px solid #FFC107; border-radius: 6px;
+  font-size: 0.85em; color: #795548; line-height: 1.5;
 }
 
 

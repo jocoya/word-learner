@@ -1,6 +1,6 @@
-const CACHE = 'word-learner-v31';
+const CACHE = 'word-learner-v32';
 const MEDIA_CACHE = 'word-learner-media'; // 圖片/音檔（跨版本保留，不隨程式更新清掉）
-const V = '?v=31';
+const V = '?v=32';
 const ASSETS = [
   './index.html',
   './style.css' + V,
