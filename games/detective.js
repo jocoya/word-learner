@@ -79,51 +79,125 @@ function initDetectiveGame(area, words) {
     });
   }
 
-  // ===== 學習模式（新字）：給線索 → 直接揭曉，不要求作答 =====
+  // ===== 學習模式（新字）：多感官流程 看→聽→跟讀→動作(TPR)→例句→確認 =====
   function renderLearnMode(target) {
     var img = getRandomImage(target);
     var sentence = (target.sentences || []).find(function(s){ return s && s.trim(); });
-    var blanked = sentence ? sentence.replace(new RegExp('\\b' + target.word + '\\b', 'gi'), '______') : '';
+    var isAction = (target.pos === 'verb') || (target.tags && target.tags.some(function(t){ return /action|動作|verb/i.test(t); }));
+    var supportsMic = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
 
-    area.innerHTML =
-      '<div class="learn-scene">' +
-        '<div class="learn-badge">🔍 認識新朋友</div>' +
-        (img ? '<img class="learn-img" src="' + img + '" alt="" onerror="this.style.display=\'none\'">' : '') +
-        (blanked ? '<div class="learn-sentence" id="learnSentence">' + esc(blanked) + '</div>' : '') +
-        '<div class="learn-reveal" id="learnReveal" style="opacity:0;">' +
-          '<div class="learn-word">' + esc(target.word) + '</div>' +
-          '<div class="learn-meaning">' + esc(target.meaning) + '</div>' +
-          '<button class="learn-speak" onclick="speakWord(\'' + esc(target.word) + '\',0.7)">🔊 再聽一次</button>' +
-        '</div>' +
-        '<div class="det-progress">' + (current+1) + ' / ' + total + '</div>' +
-        '<button class="learn-next-btn" id="learnNextBtn" onclick="learnReveal()">看答案 👀</button>' +
+    // 步驟：0=看圖聽音, 1=跟讀, 2=動作(僅動作詞), 3=例句, 4=確認
+    var steps = ['look', 'repeat'];
+    if (isAction) steps.push('action');
+    if (sentence) steps.push('sentence');
+    steps.push('confirm');
+    var stepIdx = 0;
+
+    function renderStep() {
+      var step = steps[stepIdx];
+      var html = '<div class="learn2">' +
+        '<div class="learn2-badge">🌟 認識新朋友 ' + (current+1) + '/' + total + '</div>';
+
+      // 單字卡（每步都顯示）
+      html += '<div class="learn2-card">' +
+        (img ? '<img class="learn2-img" src="' + img + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+        '<div class="learn2-word">' + esc(target.word) + '</div>' +
+        '<div class="learn2-meaning">' + esc(target.meaning) + '</div>' +
+        '<button class="learn2-speak" onclick="speakWord(\'' + esc(target.word) + '\',0.6)">🔊 聽發音</button>' +
       '</div>';
 
-    // 先念例句（如果有），讓孩子聽語境
-    if (sentence) setTimeout(function(){ speakWord(sentence, 0.7); }, 400);
-
-    var revealed = false;
-    window.learnReveal = function() {
-      if (!revealed) {
-        // 第一次按：揭曉單字
-        revealed = true;
-        var r = document.getElementById('learnReveal');
-        if (r) { r.style.transition = 'opacity 0.5s'; r.style.opacity = '1'; }
-        // 填回完整句子
-        var se = document.getElementById('learnSentence');
-        if (se && sentence) se.innerHTML = esc(sentence.replace(new RegExp('\\b' + target.word + '\\b', 'gi'),
-          '<span class="cloze-filled">' + esc(target.word) + '</span>'));
-        speakWord(target.word, 0.7);
-        var btn = document.getElementById('learnNextBtn');
-        if (btn) btn.textContent = '下一個 →';
-      } else {
-        // 第二次按：給輕量初始進度，進下一個
-        // 學習模式給 Good(視為認識)，但因為 reps=0 首玩會被 FIRST_PLAY_SCALE 壓低，不會暴衝
-        updateProgress(target.id, true, 'detective', { mistakes: 0 });
-        current++;
-        renderRound();
+      // 步驟指示
+      if (step === 'look') {
+        html += '<div class="learn2-prompt">👀 看圖片，聽聽看這個字怎麼念</div>';
+        html += '<button class="learn2-next" onclick="learnNext()">我聽到了 👂</button>';
+      } else if (step === 'repeat') {
+        html += '<div class="learn2-prompt">🎤 換你念念看！</div>';
+        if (supportsMic) html += '<button class="learn2-mic" id="learn2Mic" onclick="learnTryRepeat()">🎙️ 跟我念</button>';
+        html += '<button class="learn2-next" onclick="learnNext()">' + (supportsMic ? '念好了 →' : '我念過了 →') + '</button>';
+        html += '<div class="learn2-feedback" id="learn2Feedback"></div>';
+      } else if (step === 'action') {
+        html += '<div class="learn2-prompt">🏃 站起來，做出「' + esc(target.meaning) + '」的動作！</div>';
+        html += '<div class="learn2-action-emoji">🤸</div>';
+        html += '<button class="learn2-next" onclick="learnNext()">做好了 →</button>';
+      } else if (step === 'sentence') {
+        html += '<div class="learn2-prompt">💬 看看這個字怎麼用在句子裡</div>';
+        html += '<div class="learn2-sentence">' + esc(sentence) +
+          ' <button class="learn2-speak-sm" onclick="speakWord(\'' + esc(sentence) + '\',0.7)">🔊</button></div>';
+        html += '<button class="learn2-next" onclick="learnNext()">懂了 →</button>';
+      } else if (step === 'confirm') {
+        // 超簡單確認：目標 + 3 干擾（看圖選字）
+        var others = shuffleArray((words || []).filter(function(w){ return w.id !== target.id; })).slice(0, 3);
+        var opts = shuffleArray([target].concat(others));
+        html += '<div class="learn2-prompt">✅ 哪一個是「' + esc(target.meaning) + '」？</div>';
+        html += '<div class="learn2-choices">' +
+          opts.map(function(o){ return '<button class="learn2-choice" data-id="' + o.id + '">' + esc(o.word) + '</button>'; }).join('') +
+        '</div>';
       }
+      html += '</div>';
+      area.innerHTML = html;
+
+      // 看圖步驟：自動念兩次（多感官 看+聽）
+      if (step === 'look') {
+        setTimeout(function(){ speakWord(target.word, 0.6); }, 300);
+        setTimeout(function(){ speakWord(target.word, 0.5); }, 1500);
+      } else if (step === 'sentence') {
+        setTimeout(function(){ speakWord(sentence, 0.7); }, 300);
+      } else if (step === 'confirm') {
+        bindConfirm();
+      }
+    }
+
+    window.learnNext = function() {
+      stepIdx++;
+      if (stepIdx >= steps.length) { finishLearn(); return; }
+      renderStep();
     };
+
+    // 跟讀（語音鼓勵，不強迫）
+    window.learnTryRepeat = function() {
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) return;
+      var r = new SR(); r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 5;
+      var mic = document.getElementById('learn2Mic');
+      mic.textContent = '🔴 聽你念...'; mic.classList.add('recording');
+      r.onresult = function(e) {
+        var ok = false;
+        for (var i = 0; i < e.results[0].length; i++) {
+          if (e.results[0][i].transcript.toLowerCase().indexOf(target.word.toLowerCase()) !== -1) { ok = true; break; }
+        }
+        mic.textContent = '🎙️ 跟我念'; mic.classList.remove('recording');
+        var fb = document.getElementById('learn2Feedback');
+        if (fb) fb.innerHTML = ok ? '<span class="learn2-good">👍 念得好棒！</span>' : '<span class="learn2-try">再念一次看看～</span>';
+        if (ok) speakWord(target.word, 0.6);
+      };
+      r.onerror = function() { mic.textContent = '🎙️ 跟我念'; mic.classList.remove('recording'); };
+      r.start();
+    };
+
+    function bindConfirm() {
+      area.querySelectorAll('.learn2-choice').forEach(function(b) {
+        b.addEventListener('click', function() {
+          var ok = parseInt(b.dataset.id) === target.id;
+          b.classList.add(ok ? 'correct' : 'wrong');
+          if (!ok) {
+            var r = area.querySelector('.learn2-choice[data-id="' + target.id + '"]');
+            if (r) r.classList.add('correct');
+          }
+          speakWord(target.word, 0.6);
+          area.querySelectorAll('.learn2-choice').forEach(function(x){ x.style.pointerEvents = 'none'; });
+          setTimeout(finishLearn, 1500);
+        });
+      });
+    }
+
+    function finishLearn() {
+      // 學習模式給輕量初始進度（reps=0 首玩會被 FIRST_PLAY_SCALE 壓低，不暴衝）
+      updateProgress(target.id, true, 'detective', { mistakes: 0 });
+      current++;
+      renderRound();
+    }
+
+    renderStep();
   }
 
   // ===== 偵探模式（熟字）：清爽單欄 + 漸進線索 + 語音/選擇兩種作答 =====
@@ -154,10 +228,13 @@ function initDetectiveGame(area, words) {
     var answered = false;
     var clueShown = 1;          // 已顯示幾張線索卡
     var letterReveal = 1;       // 骨架已揭示字母數（首字母先給）
+    var imageShown = false;     // 是否已顯示單字圖
     var choicesShown = false;   // 是否已顯示選擇題
+    var targetImg = getRandomImage(target);
 
     area.innerHTML =
       '<div class="det2">' +
+        '<img class="det2-bg" src="./images/find.png" alt="">' +
         '<div class="det2-top">' +
           '<span class="det2-progress">🔍 ' + (current+1) + ' / ' + total + '</span>' +
           '<span class="det2-len">共 ' + wordLen + ' 個字母</span>' +
@@ -178,14 +255,20 @@ function initDetectiveGame(area, words) {
     function appendClue(c) {
       var div = document.createElement('div');
       div.className = 'det2-card';
-      div.innerHTML = '<span class="det2-card-icon">' + c.icon + '</span>' +
-        '<span class="det2-card-body"><b>' + esc(c.label) + '</b><br>' + esc(c.text) + '</span>';
+      if (c.img) {
+        div.innerHTML = '<span class="det2-card-icon">' + c.icon + '</span>' +
+          '<span class="det2-card-body"><b>' + esc(c.label) + '</b><br>' +
+          '<img class="det2-clue-img" src="' + c.img + '" alt="" onerror="this.style.display=\'none\'"></span>';
+      } else {
+        div.innerHTML = '<span class="det2-card-icon">' + c.icon + '</span>' +
+          '<span class="det2-card-body"><b>' + esc(c.label) + '</b><br>' + esc(c.text) + '</span>';
+      }
       cluesEl.appendChild(div);
       setTimeout(function(){ div.classList.add('show'); }, 30);
     }
     appendClue(clues[0]);
 
-    // 「給我線索」：依序 揭示線索卡 → 逐字母 → 最後給選擇題
+    // 「給我線索」：依序 揭示線索卡 → 逐字母 → 圖片 → 選擇題
     window.detNextClue = function() {
       if (answered) return;
       // 階段一：還有線索卡沒揭示
@@ -198,14 +281,21 @@ function initDetectiveGame(area, words) {
       if (letterReveal < wordLen) {
         letterReveal++;
         document.getElementById('det2Skeleton').innerHTML = buildLetterSkeleton(target.word, letterReveal);
-        // 字母揭示到一半後，提示可以用選擇題
-        if (letterReveal >= Math.ceil(wordLen / 2) && !choicesShown) {
-          var btn = document.getElementById('det2ClueBtn');
-          if (btn) btn.textContent = '🎯 給我選項';
+        if (letterReveal >= wordLen && targetImg && !imageShown) {
+          var b1 = document.getElementById('det2ClueBtn');
+          if (b1) b1.textContent = '🖼️ 給我圖片';
         }
         return;
       }
-      // 階段三：給選擇題（最後線索）
+      // 階段三：顯示單字圖
+      if (targetImg && !imageShown) {
+        imageShown = true;
+        appendClue({ icon: '🖼️', label: '圖片', img: targetImg });
+        var b2 = document.getElementById('det2ClueBtn');
+        if (b2) b2.textContent = '🎯 給我選項';
+        return;
+      }
+      // 階段四：給選擇題（最後線索）
       if (!choicesShown) showChoices();
     };
 
