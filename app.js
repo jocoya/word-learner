@@ -72,7 +72,7 @@ const GAMES = [
   { id: 'fillblank', icon: '📝', name: '句子排列',   desc: '把單字排成正確句子',  modes: ['kid'] },
   { id: 'spelling',  icon: '🔤', name: '拼字挑戰',   desc: '拼出正確的單字',     modes: ['kid'] },
   { id: 'speak',     icon: '🎤', name: '看圖說句',   desc: '看圖說出句子',       modes: ['kid'] },
-  { id: 'detective', icon: '🔍', name: '線索偵探',   desc: '聽線索猜單字',       modes: ['kid'] },
+  { id: 'detective', icon: '🔍', name: '線索偵探',   desc: '認識新字＋聽線索猜字',  modes: ['kid'] },
   { id: 'match',     icon: '🔗', name: '連連看',     desc: '英文連中文',         modes: ['kid'] },
   { id: 'cloze',     icon: '📖', name: '讀句選字',   desc: '讀句子選出單字',     modes: ['kid'] },
 ];

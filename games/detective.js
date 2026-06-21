@@ -45,6 +45,62 @@ function initDetectiveGame(area, words) {
   function renderRound() {
     if (current >= queue.length) { showResult(correct, total); return; }
     var target = queue[current];
+    // 依熟練度決定模式：新字（S=0）→ 學習模式；熟字 → 偵探模式
+    getWordStability(target.id).then(function(s) {
+      if (!s || s <= 0) renderLearnMode(target);
+      else renderDetectiveMode(target);
+    });
+  }
+
+  // ===== 學習模式（新字）：給線索 → 直接揭曉，不要求作答 =====
+  function renderLearnMode(target) {
+    var img = getRandomImage(target);
+    var sentence = (target.sentences || []).find(function(s){ return s && s.trim(); });
+    var blanked = sentence ? sentence.replace(new RegExp('\\b' + target.word + '\\b', 'gi'), '______') : '';
+
+    area.innerHTML =
+      '<div class="learn-scene">' +
+        '<div class="learn-badge">🔍 認識新朋友</div>' +
+        (img ? '<img class="learn-img" src="' + img + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+        (blanked ? '<div class="learn-sentence" id="learnSentence">' + esc(blanked) + '</div>' : '') +
+        '<div class="learn-reveal" id="learnReveal" style="opacity:0;">' +
+          '<div class="learn-word">' + esc(target.word) + '</div>' +
+          '<div class="learn-meaning">' + esc(target.meaning) + '</div>' +
+          '<button class="learn-speak" onclick="speakWord(\'' + esc(target.word) + '\',0.7)">🔊 再聽一次</button>' +
+        '</div>' +
+        '<div class="det-progress">' + (current+1) + ' / ' + total + '</div>' +
+        '<button class="learn-next-btn" id="learnNextBtn" onclick="learnReveal()">看答案 👀</button>' +
+      '</div>';
+
+    // 先念例句（如果有），讓孩子聽語境
+    if (sentence) setTimeout(function(){ speakWord(sentence, 0.7); }, 400);
+
+    var revealed = false;
+    window.learnReveal = function() {
+      if (!revealed) {
+        // 第一次按：揭曉單字
+        revealed = true;
+        var r = document.getElementById('learnReveal');
+        if (r) { r.style.transition = 'opacity 0.5s'; r.style.opacity = '1'; }
+        // 填回完整句子
+        var se = document.getElementById('learnSentence');
+        if (se && sentence) se.innerHTML = esc(sentence.replace(new RegExp('\\b' + target.word + '\\b', 'gi'),
+          '<span class="cloze-filled">' + esc(target.word) + '</span>'));
+        speakWord(target.word, 0.7);
+        var btn = document.getElementById('learnNextBtn');
+        if (btn) btn.textContent = '下一個 →';
+      } else {
+        // 第二次按：給輕量初始進度，進下一個
+        // 學習模式給 Good(視為認識)，但因為 reps=0 首玩會被 FIRST_PLAY_SCALE 壓低，不會暴衝
+        updateProgress(target.id, true, 'detective', { mistakes: 0 });
+        current++;
+        renderRound();
+      }
+    };
+  }
+
+  // ===== 偵探模式（熟字）：原本的猜謎玩法 =====
+  function renderDetectiveMode(target) {
     var sentences = (target.sentences || []).slice();
     var clues = [];
 
