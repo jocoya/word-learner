@@ -43,10 +43,7 @@ async function imgFetch(url, opts, timeoutMs) {
     clearTimeout(timer);
     if (e.name === 'AbortError') throw new Error('生圖逾時（' + (timeoutMs/1000) + '秒）');
     if (e instanceof TypeError) {
-      var hint = (location.protocol === 'https:' && url.indexOf('http:') === 0)
-        ? '\n⚠️ HTTPS 網頁不能連 HTTP 後端（mixed content）。請在電腦本機用，或讓 SwarmUI 走 HTTPS。'
-        : '\n可能原因：SwarmUI 沒開、位址錯、或沒開區網監聽。';
-      throw new Error('無法連線到 SwarmUI' + hint);
+      throw new Error('連線錯誤（' + (e.message || 'fetch failed') + '）— 確認 SwarmUI 有開、位址對、CORS=*');
     }
     throw e;
   }
@@ -58,13 +55,18 @@ async function swarmGenerate(prompt) {
   var host = imgLocalizeHost(cfg.swarmHost).replace(/\/$/, '');
 
   // 1. 取得 session
-  var sRes = await imgFetch(host + '/API/GetNewSession', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
-  }, 20000);
-  if (!sRes.ok) throw new Error('GetNewSession HTTP ' + sRes.status);
+  var sRes;
+  try {
+    sRes = await imgFetch(host + '/API/GetNewSession', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    }, 20000);
+  } catch (e) {
+    throw new Error('[步驟1 連線 SwarmUI 失敗] ' + e.message);
+  }
+  if (!sRes.ok) throw new Error('[步驟1] GetNewSession HTTP ' + sRes.status);
   var sData = await sRes.json();
   var session = sData.session_id;
-  if (!session) throw new Error('拿不到 session_id');
+  if (!session) throw new Error('[步驟1] 拿不到 session_id');
 
   // 2. 生圖
   var body = {
@@ -79,13 +81,18 @@ async function swarmGenerate(prompt) {
     cfgscale: cfg.cfgscale,
     seed: -1
   };
-  var gRes = await imgFetch(host + '/API/GenerateText2Image', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-  });
-  if (!gRes.ok) throw new Error('GenerateText2Image HTTP ' + gRes.status);
+  var gRes;
+  try {
+    gRes = await imgFetch(host + '/API/GenerateText2Image', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+  } catch (e) {
+    throw new Error('[步驟2 生圖請求失敗] ' + e.message);
+  }
+  if (!gRes.ok) throw new Error('[步驟2] GenerateText2Image HTTP ' + gRes.status);
   var gData = await gRes.json();
-  if (gData.error) throw new Error('SwarmUI: ' + gData.error);
-  if (!gData.images || !gData.images.length) throw new Error('SwarmUI 沒回傳圖片');
+  if (gData.error) throw new Error('[步驟2] SwarmUI: ' + gData.error);
+  if (!gData.images || !gData.images.length) throw new Error('[步驟2] SwarmUI 沒回傳圖片');
 
   // 3. 組完整圖片 URL（SwarmUI 回的是相對路徑）
   var imgPath = gData.images[0];
