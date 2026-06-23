@@ -68,7 +68,7 @@ async function swarmGenerate(prompt) {
   var session = sData.session_id;
   if (!session) throw new Error('[步驟1] 拿不到 session_id');
 
-  // 2. 生圖
+  // 2. 生圖（donotsave:true → SwarmUI 直接回 base64 data URL，不走 /View/ 檔案路徑，避開 CORS/載入問題）
   var body = {
     session_id: session,
     images: 1,
@@ -79,7 +79,8 @@ async function swarmGenerate(prompt) {
     height: cfg.height,
     steps: cfg.steps,
     cfgscale: cfg.cfgscale,
-    seed: -1
+    seed: -1,
+    donotsave: true
   };
   var gRes;
   try {
@@ -94,13 +95,15 @@ async function swarmGenerate(prompt) {
   if (gData.error) throw new Error('[步驟2] SwarmUI: ' + gData.error);
   if (!gData.images || !gData.images.length) throw new Error('[步驟2] SwarmUI 沒回傳圖片');
 
-  // 3. 組完整圖片 URL（SwarmUI 回的是相對路徑；檔名可能含空格/逗號，要編碼）
+  // 3. 取得圖片：donotsave 時 SwarmUI 回 base64 data URL，直接用；否則組 /View/ 路徑
   var imgPath = gData.images[0];
+  if (imgPath.indexOf('data:') === 0) {
+    return imgPath; // base64 data URL，直接回
+  }
   var fullUrl;
   if (imgPath.indexOf('http') === 0) {
     fullUrl = imgPath;
   } else {
-    // 對路徑各段做 encodeURIComponent，避免空格/逗號破壞 URL
     var encoded = imgPath.replace(/^\//, '').split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
     fullUrl = host + '/' + encoded;
   }
