@@ -155,7 +155,7 @@ async function startLearnSession(config) {
     function finishLearn(wasCorrect) {
       var correct = (wasCorrect !== false);
       if (typeof updateProgress === 'function') {
-        updateProgress(target.id, correct, 'detective', { mistakes: correct ? 0 : 1 });
+        updateProgress(target.id, correct, 'learn', { mistakes: correct ? 0 : 1 });
       }
       learnedFriends.push(target);
       current++;

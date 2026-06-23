@@ -10,8 +10,8 @@ var DECAY = -0.5;
 var FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
 
 // ===== 升級節奏調校（讓單字慢慢升，要常玩才會進步）=====
-var FIRST_PLAY_SCALE = 0.3;  // 第一次玩的初始 stability 縮放（避免一次猜對就暴衝）
-var GROWTH_SCALE = 0.5;      // 後續每次 stability 成長幅度縮放（爬升減半）
+var FIRST_PLAY_SCALE = 0.25; // 第一次玩的初始 stability 縮放（避免一次猜對就暴衝）
+var GROWTH_SCALE = 0.28;     // 後續每次 stability 成長幅度縮放（爬升放慢，要常玩才會進步）
 var MIN_ELAPSED_DAYS = 0.3;  // 同一天重複玩時，假設至少間隔的天數（讓連玩也有微量成長）
 
 // 階段門檻（stability）：熟悉期 / 應用期 / 大師期
@@ -96,7 +96,7 @@ function fsrsUpgrade(progress) {
 // 數值防呆：把 stability 限制在合理範圍，並限制單次成長倍數
 // - 過濾 NaN / Infinity（壞資料 → 退回前值或 0.1）
 // - 上限 36500（約 100 年），下限 0.01
-// - 單次複習成長不超過前值的 3 倍 + 5（避免任何公式暴衝）
+// - 單次複習成長不超過前值的 1.8 倍 + 1.2（避免任何公式暴衝，曲線平滑）
 var STABILITY_MAX = 36500;
 function fsrsClampStability(newS, prevS) {
   if (newS == null || !isFinite(newS) || isNaN(newS)) {
@@ -104,7 +104,7 @@ function fsrsClampStability(newS, prevS) {
   }
   if (newS < 0.01) newS = 0.01;
   if (prevS != null && isFinite(prevS) && prevS > 0) {
-    var cap = prevS * 3 + 5; // 單次最多成長到 3 倍 +5
+    var cap = prevS * 1.8 + 1.2; // 單次最多成長到 1.8 倍 +1.2
     if (newS > cap) newS = cap;
   }
   if (newS > STABILITY_MAX) newS = STABILITY_MAX;
@@ -191,6 +191,12 @@ function gameToRating(payload) {
   var t = payload.timeUsed || 0;
   var hint = payload.hintUsed || 0;
   var isBaby = payload.mode === 'baby';
+
+  // 認識新朋友（learn）：五步驟教學 + 超簡單看圖選字確認 → 只給 Good(3)，答錯 Again(1)
+  // 因為這是「第一次認識」，不應該因為選對一個 4 選 1 就快速升級
+  if (gt === 'learn') {
+    return m > 0 ? 1 : 3;
+  }
 
   // 難遊戲：做對代表真的熟，可給 Easy(4)
   // spelling 拼字 / cloze 讀句 / detective 猜字 / fillblank 句子排列 / speak 造句
@@ -313,6 +319,7 @@ var GAME_MIN_STABILITY = {
   memory: 0,      // 翻牌配對 - 認知最低
   listen: 0,      // 看字選圖 - 認字配對
   flashlight: 0,  // 探照燈尋寶 - 探索式
+  learn: 0,       // 認識新朋友 - 新字學習入口（門檻 0）
   bubble: 1,      // 泡泡戳戳樂 - 需要快速反應
   echo: 1,        // 魔法發音動物園 - 跟讀
   spelling: 3,    // 拼字挑戰 - 需要會拼（約熟悉期）
@@ -328,6 +335,7 @@ var GAME_NAMES_ZH = {
   memory: '翻牌配對',
   listen: '看字選圖',
   flashlight: '探照燈尋寶',
+  learn: '認識新朋友',
   bubble: '泡泡戳戳樂',
   echo: '魔法發音動物園',
   spelling: '拼字挑戰',

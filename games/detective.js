@@ -307,7 +307,7 @@ function initDetectiveGame(area, words) {
       // 認識新朋友：依確認題對錯記錄（reps=0 首玩會被首玩封頂壓在認識期，不暴衝）
       // 沒作答（例如沒有 confirm 步驟）預設視為答對
       var correct = (wasCorrect !== false);
-      updateProgress(target.id, correct, 'detective', { mistakes: correct ? 0 : 1 });
+      updateProgress(target.id, correct, 'learn', { mistakes: correct ? 0 : 1 });
       learnedFriends.push(target);
       current++;
       renderRound();
