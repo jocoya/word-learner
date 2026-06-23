@@ -343,3 +343,33 @@ async function runBulkImport() {
   setBatchProgress('bulkProgress', '✅ 完成！新增 ' + added + '，跳過(已存在) ' + skipped + '，失敗 ' + fail + '。');
   if (typeof renderWordList === 'function') renderWordList();
 }
+
+
+// 🏷️ 批次分類：AI 自動給單字打主題標籤（動物/食物/衣服...）
+async function batchClassifyTags() {
+  if (!confirm('將為所有單字自動判斷主題並加上標籤（動物、食物、衣服、動作...）。已有標籤的會保留並補充。開始嗎？')) return;
+  var words = await dbGetByIndex('words', 'pool', 'permanent');
+  if (!words.length) { setBatchProgress('batchProgress', '沒有單字'); return; }
+  var done = 0, fail = 0;
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i];
+    setBatchProgress('batchProgress', '分類中 ' + (i + 1) + '/' + words.length + '：' + esc(w.word));
+    try {
+      var raw = await aiChat(
+        'Classify the English word "' + w.word + '" (meaning: ' + (w.meaning || '') + ') into ONE simple theme for a kids vocabulary app. ' +
+        'Answer with ONLY a single Traditional Chinese theme word from: 動物, 食物, 水果, 蔬菜, 衣服, 顏色, 數字, 身體, 家庭, 動作, 情緒, 自然, 交通, 物品, 地點, 學校. ' +
+        'If none fits, answer 其他. No other text.',
+        { temperature: 0, maxTokens: 16 }
+      );
+      var tag = raw.replace(/[^\u4e00-\u9fa5]/g, '').slice(0, 4);
+      if (tag) {
+        w.tags = w.tags || [];
+        if (w.tags.indexOf(tag) === -1) w.tags.push(tag);
+        await dbPut('words', w);
+        done++;
+      } else { fail++; }
+    } catch (e) { fail++; }
+  }
+  setBatchProgress('batchProgress', '✅ 完成！分類了 ' + done + ' 個，失敗 ' + fail + ' 個。');
+  if (typeof renderWordList === 'function') renderWordList();
+}

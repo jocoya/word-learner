@@ -42,10 +42,23 @@ function initDetectiveGame(area, words) {
 
   // 建立佇列：若從「認識新字」入口進來，優先排新字（S=0）
   var learnFirst = (typeof window !== 'undefined' && window.detectiveLearnFirst);
+  var themeFilter = (typeof window !== 'undefined') ? window.learnThemeFilter : null;
   window.detectiveLearnFirst = false; // 用完即清
+  window.learnThemeFilter = null;
+
+  // 若有主題篩選，先把單字池縮到該主題
+  if (learnFirst && themeFilter) {
+    withSentence = withSentence.filter(function(w) {
+      if (themeFilter === '__notag__') return !w.tags || w.tags.length === 0;
+      return w.tags && w.tags.indexOf(themeFilter) !== -1;
+    });
+    if (withSentence.length < 1) { withSentence = words.filter(function(w){ return w.sentences && w.sentences.length; }); }
+  }
+  total = Math.min(8, withSentence.length);
 
   var current = 0, correct = 0;
   var queue;
+  var learnedFriends = []; // 這場認識的新朋友（學習模式用）
 
   function buildQueueAndStart() {
     if (learnFirst) {
@@ -70,13 +83,53 @@ function initDetectiveGame(area, words) {
   }
 
   function renderRound() {
-    if (current >= queue.length) { showResult(correct, total); return; }
+    if (current >= queue.length) {
+      // 學習模式入口：結算「今天認識了 N 個新朋友」+ 獎勵
+      if (learnFirst && learnedFriends.length > 0) { showLearnSummary(); return; }
+      showResult(correct, total);
+      return;
+    }
     var target = queue[current];
     // 依熟練度決定模式：新字（S=0）→ 學習模式；熟字 → 偵探模式
     getWordStability(target.id).then(function(s) {
       if (!s || s <= 0) renderLearnMode(target);
       else renderDetectiveMode(target);
     });
+  }
+
+  // 認識新朋友結算
+  function showLearnSummary() {
+    var div = document.createElement('div');
+    div.className = 'learn-summary';
+    var coinImg = (typeof currentChild !== 'undefined' && currentChild === 'girl') ? './images/COIN_DOG.png' : './images/COIN_CAT.png';
+    div.innerHTML = '<div class="learn-summary-box">' +
+      '<div class="learn-summary-title">🎉 認識了 ' + learnedFriends.length + ' 個新朋友！</div>' +
+      '<div class="learn-summary-friends">' +
+        learnedFriends.map(function(w){
+          var img = getRandomImage(w);
+          return '<div class="learn-summary-friend">' +
+            (img ? '<img src="' + img + '" alt="">' : '<div style="font-size:2em">🆕</div>') +
+            '<span>' + esc(w.word) + '</span></div>';
+        }).join('') +
+      '</div>' +
+      '<div class="learn-summary-reward"><img src="' + coinImg + '" style="width:28px;vertical-align:middle"> +' + learnedFriends.length + ' 金幣</div>' +
+      '<button class="btn-primary" onclick="this.closest(\'.learn-summary\').remove(); goTo(\'page-games\');">太棒了！</button>' +
+    '</div>';
+    document.body.appendChild(div);
+    setTimeout(function(){ div.classList.add('show'); }, 30);
+    // 給金幣（每個新朋友 +1，測試模式不給）
+    if (!(typeof devSkipRewards === 'function' && devSkipRewards())) {
+      giveLearnCoins(learnedFriends.length);
+    }
+  }
+
+  async function giveLearnCoins(n) {
+    if (typeof getCoins !== 'function') return;
+    var coins = await getCoins();
+    var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+    coins[child] = (coins[child] || 0) + n;
+    coins.log.push({ role: child, count: n, date: getTodayStr(), chest: '🦁 認識 ' + n + ' 個新朋友' });
+    await saveCoins(coins);
   }
 
   // ===== 學習模式（新字）：多感官流程 看→聽→跟讀→動作(TPR)→例句→確認 =====
@@ -193,6 +246,7 @@ function initDetectiveGame(area, words) {
     function finishLearn() {
       // 學習模式給輕量初始進度（reps=0 首玩會被 FIRST_PLAY_SCALE 壓低，不暴衝）
       updateProgress(target.id, true, 'detective', { mistakes: 0 });
+      learnedFriends.push(target);
       current++;
       renderRound();
     }

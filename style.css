@@ -1956,3 +1956,43 @@ body {
   .learn2-sentence { font-size: 1.8em; }
   .learn2-choice { font-size: 1.5em; padding: 20px; }
 }
+
+
+/* ===== 認識新朋友：主題選擇 ===== */
+.theme-picker { max-width: 520px; }
+.theme-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin: 14px 0;
+}
+.theme-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 16px 8px; border: 3px solid #B39DDB; border-radius: 14px;
+  background: #fff; cursor: pointer;
+}
+.theme-card:active { transform: scale(0.96); }
+.theme-any { border-color: #FFB74D; background: #FFF8E1; }
+.theme-emoji { font-size: 2em; }
+.theme-name { font-weight: 700; color: #5E35B1; font-size: 1.05em; }
+.theme-count { font-size: 0.8em; color: #999; }
+@media (min-width: 1200px) {
+  .theme-picker { max-width: 720px; }
+  .theme-emoji { font-size: 2.8em; }
+  .theme-name { font-size: 1.3em; }
+}
+
+/* ===== 認識新朋友：結算回饋 ===== */
+.learn-summary {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.35s;
+}
+.learn-summary.show { opacity: 1; }
+.learn-summary-box {
+  background: #fff; border-radius: 20px; padding: 28px; text-align: center; max-width: 90%;
+}
+.learn-summary-title { font-size: 1.6em; font-weight: 800; color: #43A047; margin-bottom: 12px; }
+.learn-summary-friends { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 12px 0; }
+.learn-summary-friend { display: flex; flex-direction: column; align-items: center; width: 80px; }
+.learn-summary-friend img { width: 70px; height: 70px; object-fit: contain; border-radius: 10px; }
+.learn-summary-friend span { font-size: 0.85em; color: #4A90D9; font-weight: 600; }
+.learn-summary-reward { font-size: 1.2em; color: #FF9800; font-weight: 700; margin: 10px 0; }
