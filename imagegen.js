@@ -94,9 +94,16 @@ async function swarmGenerate(prompt) {
   if (gData.error) throw new Error('[步驟2] SwarmUI: ' + gData.error);
   if (!gData.images || !gData.images.length) throw new Error('[步驟2] SwarmUI 沒回傳圖片');
 
-  // 3. 組完整圖片 URL（SwarmUI 回的是相對路徑）
+  // 3. 組完整圖片 URL（SwarmUI 回的是相對路徑；檔名可能含空格/逗號，要編碼）
   var imgPath = gData.images[0];
-  var fullUrl = imgPath.indexOf('http') === 0 ? imgPath : (host + '/' + imgPath.replace(/^\//, ''));
+  var fullUrl;
+  if (imgPath.indexOf('http') === 0) {
+    fullUrl = imgPath;
+  } else {
+    // 對路徑各段做 encodeURIComponent，避免空格/逗號破壞 URL
+    var encoded = imgPath.replace(/^\//, '').split('/').map(function(seg){ return encodeURIComponent(seg); }).join('/');
+    fullUrl = host + '/' + encoded;
+  }
   return fullUrl;
 }
 
