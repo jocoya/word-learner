@@ -90,7 +90,9 @@ function initDetectiveGame(area, words) {
       return;
     }
     var target = queue[current];
-    // 依熟練度決定模式：新字（S=0）→ 學習模式；熟字 → 偵探模式
+    // 從「認識新朋友」入口進來（learnFirst）→ 整場都用學習模式（五步驟）
+    if (learnFirst) { renderLearnMode(target); return; }
+    // 一般進入線索偵探：依熟練度決定。新字（S=0）→ 學習模式；熟字 → 偵探模式
     getWordStability(target.id).then(function(s) {
       if (!s || s <= 0) renderLearnMode(target);
       else renderDetectiveMode(target);
@@ -289,18 +291,20 @@ function initDetectiveGame(area, words) {
     area.innerHTML =
       '<div class="det2">' +
         '<img class="det2-bg" src="./images/find.png" alt="">' +
-        '<div class="det2-top">' +
-          '<span class="det2-progress">🔍 ' + (current+1) + ' / ' + total + '</span>' +
-          '<span class="det2-len">共 ' + wordLen + ' 個字母</span>' +
-        '</div>' +
-        '<div class="det2-skeleton" id="det2Skeleton">' + buildLetterSkeleton(target.word, 1) + '</div>' +
-        '<div class="det2-clues" id="det2Clues"></div>' +
-        '<div class="det2-feedback" id="det2Feedback"></div>' +
-        '<div class="det2-choices" id="det2Choices" hidden></div>' +
-        '<div class="det2-actions">' +
-          '<button class="det2-btn det2-clue" id="det2ClueBtn" onclick="detNextClue()">🔍 給我線索</button>' +
-          (supported ? '<button class="det2-btn det2-mic" id="det2MicBtn" onclick="detVoiceAnswer()">🎙️ 說答案</button>' : '') +
-          '<button class="det2-btn det2-skip" onclick="skipDetective()">跳過 →</button>' +
+        '<div class="det2-panel">' +
+          '<div class="det2-top">' +
+            '<span class="det2-progress">🔍 ' + (current+1) + ' / ' + total + '</span>' +
+            '<span class="det2-len">共 ' + wordLen + ' 個字母</span>' +
+          '</div>' +
+          '<div class="det2-skeleton" id="det2Skeleton">' + buildLetterSkeleton(target.word, 1) + '</div>' +
+          '<div class="det2-clues" id="det2Clues"></div>' +
+          '<div class="det2-feedback" id="det2Feedback"></div>' +
+          '<div class="det2-choices" id="det2Choices" hidden></div>' +
+          '<div class="det2-actions">' +
+            '<button class="det2-btn det2-clue" id="det2ClueBtn" onclick="detNextClue()">🔍 給我線索</button>' +
+            (supported ? '<button class="det2-btn det2-mic" id="det2MicBtn" onclick="detVoiceAnswer()">🎙️ 說答案</button>' : '') +
+            '<button class="det2-btn det2-skip" onclick="skipDetective()">跳過 →</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
 

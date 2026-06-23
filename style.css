@@ -1811,23 +1811,39 @@ body {
 }
 
 
-/* ===== 線索偵探 v2（清爽單欄 + 生動）===== */
+/* ===== 線索偵探 v2：find.png 滿版背景 + 右半部面板 ===== */
 .det2 {
+  position: relative;
+  width: 100%; height: 100%;
+  overflow: hidden;
+}
+.det2-bg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  z-index: 0;
+}
+/* 內容面板：疊在右半部（背景圖右半是空白牆）*/
+.det2-panel {
+  position: absolute; top: 0; right: 0;
+  width: 50%; height: 100%;
   display: flex; flex-direction: column; align-items: center;
-  gap: 16px; padding: 20px; max-width: 640px; margin: 0 auto;
-  min-height: 100%;
+  gap: 14px; padding: 24px 20px;
+  z-index: 1;
+  overflow-y: auto;
+  background: linear-gradient(to right, rgba(255,255,255,0), rgba(255,255,255,0.35) 12%, rgba(255,255,255,0.6) 30%);
 }
 .det2-top {
   width: 100%; display: flex; justify-content: space-between; align-items: center;
-  color: #888; font-weight: 600;
+  color: #5E35B1; font-weight: 700;
+  text-shadow: 0 1px 3px rgba(255,255,255,0.8);
 }
-.det2-progress { font-size: 1.1em; color: #7E57C2; }
+.det2-progress { font-size: 1.1em; }
 .det2-skeleton {
-  font-size: 2.8em; font-weight: 900; letter-spacing: 10px;
-  color: #5E35B1; text-align: center;
-  background: linear-gradient(135deg, #EDE7F6, #D1C4E9);
-  padding: 16px 24px; border-radius: 16px; min-width: 60%;
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.08);
+  font-size: 2.6em; font-weight: 900; letter-spacing: 10px;
+  color: #4527A0; text-align: center;
+  background: rgba(255,255,255,0.85);
+  padding: 14px 20px; border-radius: 16px; width: 90%;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
 }
 .det2-answer {
   color: #43A047; letter-spacing: 4px;
@@ -1836,66 +1852,52 @@ body {
 }
 .det2-clues { width: 100%; display: flex; flex-direction: column; gap: 10px; }
 .det2-card {
-  display: flex; gap: 12px; align-items: flex-start;
-  background: #fff; border-radius: 14px; padding: 14px 16px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  display: flex; gap: 10px; align-items: flex-start;
+  background: rgba(255,255,255,0.92); border-radius: 14px; padding: 12px 14px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
   border-left: 5px solid #7E57C2;
-  opacity: 0; transform: translateX(-20px);
+  opacity: 0; transform: translateX(20px);
   transition: opacity 0.4s ease, transform 0.4s ease;
 }
 .det2-card.show { opacity: 1; transform: translateX(0); }
-.det2-card-icon { font-size: 1.8em; flex-shrink: 0; }
-.det2-card-body { font-size: 1.2em; color: #333; line-height: 1.5; }
+.det2-card-icon { font-size: 1.6em; flex-shrink: 0; }
+.det2-card-body { font-size: 1.1em; color: #333; line-height: 1.5; }
 .det2-card-body b { color: #7E57C2; font-size: 0.85em; }
-.det2-feedback { min-height: 28px; text-align: center; font-size: 1.2em; }
-.det2-win { color: #43A047; font-weight: 800; animation: detAnswerPop 0.4s; }
-.det2-try { color: #FF9800; font-weight: 600; }
-.det2-choices { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.det2-clue-img { max-width: 100%; max-height: 160px; object-fit: contain; border-radius: 10px; margin-top: 6px; }
+.det2-feedback { min-height: 26px; text-align: center; font-size: 1.2em; font-weight: 700; text-shadow: 0 1px 3px rgba(255,255,255,0.8); }
+.det2-win { color: #2E7D32; font-weight: 800; animation: detAnswerPop 0.4s; }
+.det2-try { color: #E65100; font-weight: 700; }
+.det2-choices { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .det2-choice {
-  padding: 16px; font-size: 1.25em; font-weight: 700;
+  padding: 14px; font-size: 1.15em; font-weight: 700;
   border: 3px solid #B39DDB; border-radius: 14px;
-  background: #fff; color: #5E35B1; cursor: pointer;
+  background: rgba(255,255,255,0.95); color: #5E35B1; cursor: pointer;
   transition: transform 0.15s;
 }
 .det2-choice:active { transform: scale(0.96); }
 .det2-choice.correct { border-color: #4CAF50; background: #E8F5E9; color: #4CAF50; }
 .det2-choice.wrong { border-color: #f44336; background: #FFEBEE; color: #f44336; }
-.det2-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: auto; }
+.det2-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: auto; }
 .det2-btn {
-  padding: 14px 24px; font-size: 1.15em; font-weight: 700;
+  padding: 12px 20px; font-size: 1.05em; font-weight: 700;
   border: none; border-radius: 14px; cursor: pointer;
 }
 .det2-clue { background: linear-gradient(135deg, #7E57C2, #5E35B1); color: #fff; }
 .det2-mic { background: linear-gradient(135deg, #42A5F5, #1E88E5); color: #fff; }
 .det2-mic.recording { background: #f44336; animation: pulse 1s infinite; }
-.det2-skip { background: #ECEFF1; color: #78909C; }
+.det2-skip { background: rgba(236,239,241,0.9); color: #607D8B; }
 .det2-btn:active { transform: scale(0.96); }
 
 /* 大平板放大 */
 @media (min-width: 1200px) {
-  .det2 { max-width: 820px; }
-  .det2-skeleton { font-size: 3.6em; letter-spacing: 14px; }
-  .det2-card-body { font-size: 1.5em; }
-  .det2-choice { font-size: 1.5em; padding: 20px; }
-  .det2-btn { font-size: 1.35em; padding: 16px 30px; }
+  .det2-skeleton { font-size: 3.4em; letter-spacing: 14px; }
+  .det2-card-body { font-size: 1.4em; }
+  .det2-choice { font-size: 1.4em; padding: 18px; }
+  .det2-btn { font-size: 1.3em; padding: 16px 28px; }
 }
-
-
-/* ===== 線索偵探：find.png 氛圍背景 + 圖片線索 ===== */
-.det2 { position: relative; }
-.det2-bg {
-  position: absolute; top: 8px; right: 8px;
-  width: 80px; height: 80px; object-fit: contain;
-  opacity: 0.5; pointer-events: none; z-index: 0;
-}
-.det2 > * { position: relative; z-index: 1; }
-.det2-clue-img {
-  max-width: 180px; max-height: 150px; object-fit: contain;
-  border-radius: 10px; margin-top: 6px;
-}
-@media (min-width: 1200px) {
-  .det2-bg { width: 120px; height: 120px; }
-  .det2-clue-img { max-width: 260px; max-height: 220px; }
+/* 直向（窄螢幕）時面板放寬到滿版，避免太擠 */
+@media (max-width: 700px) {
+  .det2-panel { width: 100%; background: rgba(255,255,255,0.75); }
 }
 
 /* ===== 學習新字 v2：多感官流程 ===== */
