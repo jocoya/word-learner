@@ -1,8 +1,10 @@
 // 泡泡戳戳樂遊戲（物理彈跳 + 粒子爆裂版）
-function initBubbleGame(area, words) {
+// maxRounds: 可選，限制題數（每日挑戰用，例如只玩 3 題）；不傳則最多 8 題
+function initBubbleGame(area, words, maxRounds) {
   var isKid = currentMode === 'kid';
   var isBaby = currentMode === 'baby';
-  var total = Math.min(8, words.length);
+  var limit = (typeof maxRounds === 'number' && maxRounds > 0) ? maxRounds : 8;
+  var total = Math.min(limit, words.length);
   var queue = shuffleArray(words).slice(0, total);
   var current = 0, correct = 0, animId = null, roundStart = 0;
 

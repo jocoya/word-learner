@@ -233,8 +233,8 @@ async function showResult(correct, total) {
     goTo('page-result');
     return;
   }
-  if (dailyRole && pct >= 0.5) {
-    // 每日挑戰：完成給 1 金幣，一天一次（不可重複刷）
+  if (dailyRole) {
+    // 每日挑戰：只要完成挑戰就給 1 金幣，一天一次（不可重複刷，與分數無關）
     const canEarn = await checkDailyCoinLimit(dailyRole);
     if (canEarn) {
       await awardDailyCoin(dailyRole);
@@ -245,8 +245,6 @@ async function showResult(correct, total) {
     } else {
       if (coinArea) coinArea.innerHTML = '<div style="color:#999;">今天已經拿過金幣了！明天再來 🎉</div>';
     }
-  } else if (dailyRole && coinArea) {
-    coinArea.innerHTML = '<div style="color:#999;">這次沒拿到金幣，再試一次！</div>';
   } else if (coinArea) {
     coinArea.innerHTML = '';
   }

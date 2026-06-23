@@ -124,15 +124,15 @@ async function planDailyChallenge(role) {
   if (level === 'beginner') {
     return [
       { gameType: 'listen',   count: 3, minS: 0 },
-      { gameType: 'memory',   count: 0, minS: 0 }, // 真正翻牌：一局多字
-      { gameType: 'bubble',   count: 0, minS: 0 }  // 一局多字
+      { gameType: 'memory',   count: 0, minS: 0, memMode: 'baby' }, // 萌新翻牌：圖配圖（小寶貝風格）
+      { gameType: 'bubble',   count: 0, minS: 0, rounds: 3 } // 泡泡：限 3 題
     ];
   }
   if (level === 'intermediate') {
     return [
       { gameType: 'listen',    count: 3, minS: 0 },
       { gameType: 'fillblank', count: 3, minS: 0 },
-      { gameType: 'bubble',    count: 0, minS: 0 }
+      { gameType: 'bubble',    count: 0, minS: 0, rounds: 3 }
     ];
   }
   // advanced
@@ -140,7 +140,7 @@ async function planDailyChallenge(role) {
     { gameType: 'listen',    count: 3, minS: 0 },
     { gameType: 'fillblank', count: 3, minS: 0 },
     { gameType: 'spelling',  count: 3, minS: 0 },
-    { gameType: 'bubble',    count: 0, minS: 0 }
+    { gameType: 'bubble',    count: 0, minS: 0, rounds: 3 }
   ];
 }
 
@@ -207,7 +207,7 @@ startDailyWithRole = async function(role) {
     }
     if (seg.count === 0) {
       // 一局多字（bubble / memory）：至少要 4 個才能玩
-      if (picked.length >= 4) segments.push({ gameType: seg.gameType, words: picked, multi: true });
+      if (picked.length >= 4) segments.push({ gameType: seg.gameType, words: picked, multi: true, rounds: seg.rounds || 0, memMode: seg.memMode || null });
     } else {
       // 一般區段：有幾個算幾個（不足 count 就用現有的，至少 1 個才納入）
       if (picked.length >= 1) segments.push({ gameType: seg.gameType, words: picked.slice(0, seg.count), multi: false });
@@ -297,7 +297,7 @@ startDailyWithRole = async function(role) {
         document.getElementById('gameScore').textContent = correctQuestions + '/' + totalQuestions;
         segIdx++;
         setTimeout(runNextSegment, 1500);
-      });
+      }, seg.rounds, seg.memMode);
     } else {
       nextInSeg();
     }
@@ -330,18 +330,21 @@ function renderMixMemorySingle(area, target, others, cb) {
 }
 
 // 一局多字區段：劫持 showResult 收結算（bubble / memory 等整局遊戲共用）
-function runFullGameSegment(area, gameType, words, doneCb) {
+// rounds: 可選，限制題數（bubble 用）
+// memModeOverride: 可選，覆蓋 memory 顯示模式（'baby'=圖配圖 / 'kid'=字配圖）
+function runFullGameSegment(area, gameType, words, doneCb, rounds, memModeOverride) {
   var origShowResult = showResult;
   showResult = function(correctCount, totalCount) {
     showResult = origShowResult; // 立刻還原
     if (doneCb) doneCb(correctCount, totalCount);
   };
   var shuffled = shuffleArray(words);
+  var defMode = (typeof currentMode !== 'undefined' ? currentMode : 'kid');
   switch (gameType) {
-    case 'bubble': initBubbleGame(area, shuffled); break;
-    case 'memory': initMemoryGame(area, shuffled, (typeof currentMode !== 'undefined' ? currentMode : 'kid')); break;
-    case 'listen': initListenGame(area, shuffled, (typeof currentMode !== 'undefined' ? currentMode : 'kid')); break;
-    default:       initBubbleGame(area, shuffled);
+    case 'bubble': initBubbleGame(area, shuffled, rounds || 0); break;
+    case 'memory': initMemoryGame(area, shuffled, memModeOverride || defMode); break;
+    case 'listen': initListenGame(area, shuffled, defMode); break;
+    default:       initBubbleGame(area, shuffled, rounds || 0);
   }
 }
 
