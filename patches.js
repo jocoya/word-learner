@@ -124,23 +124,23 @@ async function planDailyChallenge(role) {
   if (level === 'beginner') {
     return [
       { gameType: 'listen',   count: 3, minS: 0 },
-      { gameType: 'memory',   count: 3, minS: 0 },
-      { gameType: 'bubble',   count: 0, minS: 1 } // 一局多字
+      { gameType: 'memory',   count: 0, minS: 0 }, // 真正翻牌：一局多字
+      { gameType: 'bubble',   count: 0, minS: 0 }  // 一局多字
     ];
   }
   if (level === 'intermediate') {
     return [
       { gameType: 'listen',    count: 3, minS: 0 },
-      { gameType: 'fillblank', count: 3, minS: 1 },
-      { gameType: 'bubble',    count: 0, minS: 1 }
+      { gameType: 'fillblank', count: 3, minS: 0 },
+      { gameType: 'bubble',    count: 0, minS: 0 }
     ];
   }
   // advanced
   return [
     { gameType: 'listen',    count: 3, minS: 0 },
-    { gameType: 'fillblank', count: 3, minS: 1 },
-    { gameType: 'spelling',  count: 3, minS: 4 },
-    { gameType: 'bubble',    count: 0, minS: 1 }
+    { gameType: 'fillblank', count: 3, minS: 0 },
+    { gameType: 'spelling',  count: 3, minS: 0 },
+    { gameType: 'bubble',    count: 0, minS: 0 }
   ];
 }
 
@@ -199,12 +199,18 @@ startDailyWithRole = async function(role) {
   for (var i = 0; i < plan.length; i++) {
     var seg = plan[i];
     var picked = await pickWordsByMinStability(dueWords, seg.minS, seg.count);
+    if (seg.gameType === 'fillblank') {
+      // 句子排列只能用有例句的單字
+      picked = picked.filter(function(w) {
+        return w.sentences && w.sentences.some(function(s) { return s && s.trim().split(/\s+/).length >= 2; });
+      });
+    }
     if (seg.count === 0) {
-      // bubble：至少要 4 個才能玩
-      if (picked.length >= 4) segments.push({ gameType: seg.gameType, words: picked });
+      // 一局多字（bubble / memory）：至少要 4 個才能玩
+      if (picked.length >= 4) segments.push({ gameType: seg.gameType, words: picked, multi: true });
     } else {
-      // 一般區段：必須剛好 count 個
-      if (picked.length >= seg.count) segments.push({ gameType: seg.gameType, words: picked });
+      // 一般區段：有幾個算幾個（不足 count 就用現有的，至少 1 個才納入）
+      if (picked.length >= 1) segments.push({ gameType: seg.gameType, words: picked.slice(0, seg.count), multi: false });
     }
   }
 
@@ -221,7 +227,7 @@ startDailyWithRole = async function(role) {
   area.innerHTML = '';
 
   var totalQuestions = segments.reduce(function(sum, s) {
-    return sum + (s.gameType === 'bubble' ? 1 : s.words.length);
+    return sum + (s.multi ? 1 : s.words.length);
   }, 0);
   var doneQuestions = 0;
   var correctQuestions = 0;
@@ -243,7 +249,7 @@ startDailyWithRole = async function(role) {
 
   function runSegment(seg) {
     var inSegDone = 0;
-    var totalInSeg = seg.gameType === 'bubble' ? 1 : seg.words.length;
+    var totalInSeg = seg.words.length;
 
     function nextInSeg() {
       if (inSegDone >= totalInSeg) {
@@ -258,19 +264,22 @@ startDailyWithRole = async function(role) {
 
       area.innerHTML = '';
       function onAnswer(isCorrect, payload) {
-        // 寫 FSRS 進度
         var extra = payload || { mistakes: isCorrect ? 0 : 1 };
-        updateProgress(target.id, isCorrect, seg.gameType, extra);
-        if (isCorrect) correctQuestions++;
-        doneQuestions++;
+        // skip:true 代表這題沒有可用內容（例如沒例句），不計分、不寫 FSRS
+        if (!(extra && extra.skip)) {
+          updateProgress(target.id, isCorrect, seg.gameType, extra);
+          if (isCorrect) correctQuestions++;
+          doneQuestions++;
+        } else {
+          totalQuestions = Math.max(0, totalQuestions - 1);
+        }
         document.getElementById('gameScore').textContent = correctQuestions + '/' + totalQuestions;
         inSegDone++;
-        setTimeout(nextInSeg, 1200);
+        setTimeout(nextInSeg, (extra && extra.skip) ? 0 : 1200);
       }
 
       switch (seg.gameType) {
         case 'listen':    renderMixListen(area, target, options, 'kid', onAnswer); break;
-        case 'memory':    renderMixMemorySingle(area, target, others, onAnswer); break;
         case 'fillblank': renderMixFillblank(area, target, dueWords, onAnswer); break;
         case 'spelling':  renderMixSpelling(area, target, onAnswer); break;
         case 'speak':     renderMixSpeak(area, target, onAnswer); break;
@@ -278,10 +287,10 @@ startDailyWithRole = async function(role) {
       }
     }
 
-    if (seg.gameType === 'bubble') {
-      // 一局多字 bubble — bubble.js 內部已經會自己呼叫 updateProgress 寫 FSRS，
+    if (seg.multi) {
+      // 一局多字（bubble / memory）— 遊戲內部已自己呼叫 updateProgress 寫 FSRS，
       // 這裡只透過 hook showResult 收結算結果，避免雙寫
-      runBubbleSegment(area, seg.words, function(correctCount, totalCount) {
+      runFullGameSegment(area, seg.gameType, seg.words, function(correctCount, totalCount) {
         var success = correctCount >= Math.ceil(totalCount * 0.6);
         if (success) correctQuestions++;
         doneQuestions++;
@@ -297,7 +306,7 @@ startDailyWithRole = async function(role) {
   runNextSegment();
 };
 
-// 單題版 memory（一張目標 + 3 張干擾，找出目標）
+// 單題版 memory（保留供其他地方相容；每日挑戰已改用真正翻牌）
 function renderMixMemorySingle(area, target, others, cb) {
   var img = getRandomImage(target);
   var options = shuffleArray([target].concat(others));
@@ -320,14 +329,25 @@ function renderMixMemorySingle(area, target, others, cb) {
   });
 }
 
-// bubble 區段：一局多字。劫持 showResult 收結算
-function runBubbleSegment(area, words, doneCb) {
+// 一局多字區段：劫持 showResult 收結算（bubble / memory 等整局遊戲共用）
+function runFullGameSegment(area, gameType, words, doneCb) {
   var origShowResult = showResult;
   showResult = function(correctCount, totalCount) {
     showResult = origShowResult; // 立刻還原
     if (doneCb) doneCb(correctCount, totalCount);
   };
-  initBubbleGame(area, shuffleArray(words));
+  var shuffled = shuffleArray(words);
+  switch (gameType) {
+    case 'bubble': initBubbleGame(area, shuffled); break;
+    case 'memory': initMemoryGame(area, shuffled, (typeof currentMode !== 'undefined' ? currentMode : 'kid')); break;
+    case 'listen': initListenGame(area, shuffled, (typeof currentMode !== 'undefined' ? currentMode : 'kid')); break;
+    default:       initBubbleGame(area, shuffled);
+  }
+}
+
+// 舊名相容
+function runBubbleSegment(area, words, doneCb) {
+  runFullGameSegment(area, 'bubble', words, doneCb);
 }
 
 // ===== 圖片預載 =====

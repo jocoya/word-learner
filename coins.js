@@ -190,6 +190,34 @@ function renderCalendar(completedDates) {
 
 // ===== 滿版獎勵圖片（點擊才消失）=====
 // type: 'coin' → give C.png；'diamond' → give D.png
+// 點擊消失後：播放音效 + 依目前小孩飄出 COIN_CAT(小男生)/COIN_DOG(小女生) +1
+function playRewardChime() {
+  try {
+    var c = new (window.AudioContext || window.webkitAudioContext)();
+    [659.25, 783.99, 1046.5].forEach(function(f, i) {
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, c.currentTime + i * 0.1);
+      g.gain.exponentialRampToValueAtTime(0.35, c.currentTime + i * 0.1 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + i * 0.1 + 0.35);
+      o.connect(g); g.connect(c.destination);
+      o.start(c.currentTime + i * 0.1); o.stop(c.currentTime + i * 0.1 + 0.35);
+    });
+  } catch (e) {}
+}
+
+function showCoinPlusOne() {
+  var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+  var coinImg = child === 'girl' ? './images/COIN_DOG.png' : './images/COIN_CAT.png';
+  var wrap = document.createElement('div');
+  wrap.className = 'coin-plus-one';
+  wrap.innerHTML = '<img src="' + encodeURI(coinImg) + '" alt="coin"><span>+1</span>';
+  document.body.appendChild(wrap);
+  setTimeout(function() { wrap.classList.add('show'); }, 30);
+  setTimeout(function() { wrap.classList.remove('show'); }, 1600);
+  setTimeout(function() { wrap.remove(); }, 2000);
+}
+
 function showRewardImage(type, onClose) {
   var img = type === 'diamond' ? './images/give D.png' : './images/give C.png';
   var div = document.createElement('div');
@@ -197,6 +225,8 @@ function showRewardImage(type, onClose) {
   div.innerHTML = '<img src="' + encodeURI(img) + '" alt="獎勵">';
   div.addEventListener('click', function() {
     div.classList.remove('show');
+    playRewardChime();
+    showCoinPlusOne();
     setTimeout(function() { div.remove(); if (onClose) onClose(); }, 300);
   });
   document.body.appendChild(div);

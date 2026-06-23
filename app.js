@@ -1320,20 +1320,245 @@ function renderMixEcho(area, target, words, cb) {
   setTimeout(function() { if(!done){done=true;cb(false);} }, 15000);
 }
 
+// 單題拼字（不呼叫 updateProgress / showResult，由每日挑戰的 onAnswer 處理）
 function renderMixSpelling(area, target, cb) {
-  initSpellingGame.__singleMode = { target: target, cb: cb };
-  initSpellingGame(area, [target, target, target, target]);
+  var letters = target.word.toLowerCase().split('');
+  var img = getRandomImage(target);
+  var blankCount = Math.max(2, Math.ceil(letters.length * 0.5));
+  var allIndices = letters.map(function(_, i) { return i; });
+  var blankIndices = shuffleArray(allIndices).slice(0, Math.min(blankCount, letters.length));
+  blankIndices.sort(function(a, b) { return a - b; });
+  var blankLetters = blankIndices.map(function(i) { return letters[i]; });
+  var shuffledBlanks = shuffleArray(blankLetters.slice());
+
+  area.innerHTML =
+    '<div class="spell-container">' +
+      (img ? '<img class="spell-image" src="' + img + '" alt="" onerror="this.style.display=\'none\'" />' : '') +
+      '<div class="spell-meaning">' + esc(target.meaning) + '</div>' +
+      '<button class="listen-play-btn" onclick="speakWord(\'' + esc(target.word) + '\')" title="聽發音" style="font-size:2em;margin-bottom:12px;">🔊</button>' +
+      '<div class="spell-slots" id="spellSlots">' +
+        letters.map(function(l, i) {
+          return blankIndices.indexOf(i) !== -1
+            ? '<div class="spell-slot" data-blank="true" data-pos="' + i + '"></div>'
+            : '<div class="spell-slot filled hint" data-blank="false">' + l + '</div>';
+        }).join('') +
+      '</div>' +
+      '<div class="spell-letters" id="spellLetters">' +
+        shuffledBlanks.map(function(l, i) { return '<button class="spell-letter" data-idx="' + i + '" data-letter="' + l + '">' + l + '</button>'; }).join('') +
+      '</div>' +
+      '<div class="spell-result" id="spellResult"></div>' +
+    '</div>';
+
+  var filled = [];
+  var blankSlots = area.querySelectorAll('.spell-slot[data-blank="true"]');
+  var letterBtns = area.querySelectorAll('.spell-letter');
+  var answered = false;
+
+  letterBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (answered || btn.classList.contains('used')) return;
+      btn.classList.add('used');
+      var letter = btn.dataset.letter;
+      filled.push({ letter: letter, btnEl: btn });
+      var slot = blankSlots[filled.length - 1];
+      slot.textContent = letter;
+      slot.classList.add('filled');
+
+      if (filled.length === blankIndices.length) {
+        answered = true;
+        var fullAnswer = letters.slice();
+        filled.forEach(function(f, fi) { fullAnswer[blankIndices[fi]] = f.letter; });
+        var isCorrect = fullAnswer.join('') === target.word.toLowerCase();
+        var resultEl = document.getElementById('spellResult');
+        if (isCorrect) {
+          resultEl.textContent = '✅ 正確！';
+          resultEl.className = 'spell-result correct';
+        } else {
+          resultEl.textContent = '❌ 正確答案是 ' + target.word.toLowerCase();
+          resultEl.className = 'spell-result wrong';
+          blankSlots.forEach(function(s, si) {
+            s.textContent = blankLetters[si];
+            s.style.color = (filled[si] && s.textContent === filled[si].letter) ? '#4CAF50' : '#f44336';
+          });
+        }
+        speakWord(target.word);
+        var wrongCount = 0;
+        for (var li = 0; li < filled.length; li++) {
+          if (filled[li] && blankLetters[li] && filled[li].letter !== blankLetters[li]) wrongCount++;
+        }
+        letterBtns.forEach(function(b) { b.style.pointerEvents = 'none'; });
+        cb(isCorrect, { mistakes: wrongCount });
+      }
+    });
+  });
+
+  blankSlots.forEach(function(slot, i) {
+    slot.addEventListener('click', function() {
+      if (answered || i >= filled.length) return;
+      while (filled.length > i) {
+        var removed = filled.pop();
+        removed.btnEl.classList.remove('used');
+        blankSlots[filled.length].textContent = '';
+        blankSlots[filled.length].classList.remove('filled');
+      }
+    });
+  });
 }
 
+// 單題句子排列（語塊拖排，不呼叫 updateProgress / showResult）
 function renderMixFillblank(area, target, words, cb) {
-  if (!target.sentences || target.sentences.length === 0) { cb(false); return; }
-  initFillBlankGame.__singleMode = { target: target, cb: cb };
-  initFillBlankGame(area, [target, target, target, target]);
+  var valid = (target.sentences || []).filter(function(s) { return s && s.trim().split(/\s+/).length >= 2; });
+  if (valid.length === 0) { cb(true, { mistakes: 0, skip: true }); return; } // 沒例句：跳過不計分
+  var sorted = valid.slice().sort(function(a, b) { return a.split(/\s+/).length - b.split(/\s+/).length; });
+  var pickPool = sorted.slice(0, Math.max(1, Math.ceil(sorted.length / 2)));
+  var sentence = pickPool[Math.floor(Math.random() * pickPool.length)];
+  var img = getRandomImage(target);
+  var correctWords = chunkSentence(sentence, target.word);
+  var shuffled = shuffleArray(correctWords.slice());
+
+  area.innerHTML =
+    '<div class="fill-container">' +
+      (img ? '<img class="fill-image" src="' + img + '" alt="" onerror="this.style.display=\'none\'" />' : '') +
+      '<div style="font-size:1.1em;color:#666;margin-bottom:8px;">' + esc(target.meaning) +
+        ' <button onclick="speakWord(\'' + esc(sentence) + '\', 0.7)" style="background:none;border:none;font-size:1.2em;cursor:pointer;vertical-align:middle;">🔊</button></div>' +
+      '<p style="color:#999;margin-bottom:12px;">把語塊排成正確的句子</p>' +
+      '<div class="sort-slots" id="mixSortSlots"></div>' +
+      '<div class="sort-bank" id="mixSortBank">' +
+        shuffled.map(function(w, i) { return '<button class="sort-word" data-idx="' + i + '" data-word="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') +
+      '</div>' +
+      '<div class="sort-actions">' +
+        '<button class="btn-ghost" id="mixSortClear">清除</button>' +
+        '<button class="btn-primary" id="mixSortCheck" disabled>確認</button>' +
+      '</div>' +
+      '<div class="sort-result" id="mixSortResult"></div>' +
+    '</div>';
+
+  var slotsEl = document.getElementById('mixSortSlots');
+  var bankEl = document.getElementById('mixSortBank');
+  var clearBtn = document.getElementById('mixSortClear');
+  var checkBtn = document.getElementById('mixSortCheck');
+  var placed = [];
+  var answered = false;
+
+  function renderSlots() {
+    slotsEl.innerHTML = placed.map(function(p, i) { return '<button class="sort-placed" data-i="' + i + '">' + esc(p.word) + '</button>'; }).join('');
+    slotsEl.querySelectorAll('.sort-placed').forEach(function(el) {
+      el.addEventListener('click', function() {
+        if (answered) return;
+        var i = parseInt(el.dataset.i);
+        var removed = placed.splice(i, 1)[0];
+        removed.btnEl.classList.remove('used');
+        renderSlots();
+      });
+    });
+    checkBtn.disabled = placed.length !== correctWords.length;
+  }
+
+  bankEl.querySelectorAll('.sort-word').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (answered || btn.classList.contains('used')) return;
+      btn.classList.add('used');
+      placed.push({ word: btn.dataset.word, btnEl: btn });
+      renderSlots();
+    });
+  });
+
+  clearBtn.addEventListener('click', function() {
+    if (answered) return;
+    placed.forEach(function(p) { p.btnEl.classList.remove('used'); });
+    placed = [];
+    renderSlots();
+  });
+
+  checkBtn.addEventListener('click', function() {
+    if (answered) return;
+    answered = true;
+    var answer = placed.map(function(p) { return p.word; }).join(' ').toLowerCase();
+    var isCorrect = answer === correctWords.join(' ').toLowerCase();
+    var resultEl = document.getElementById('mixSortResult');
+    if (isCorrect) {
+      resultEl.innerHTML = '✅ 正確！';
+      resultEl.style.color = '#4CAF50';
+    } else {
+      resultEl.innerHTML = '❌ 正確順序：<span style="color:#667eea;font-weight:600;">' + esc(sentence) + '</span>';
+      resultEl.style.color = '#f44336';
+    }
+    speakWord(sentence, 0.7);
+    checkBtn.disabled = true;
+    clearBtn.disabled = true;
+    bankEl.querySelectorAll('.sort-word').forEach(function(b) { b.style.pointerEvents = 'none'; });
+    slotsEl.querySelectorAll('.sort-placed').forEach(function(b) { b.style.pointerEvents = 'none'; });
+    cb(isCorrect, { mistakes: isCorrect ? 0 : 1 });
+  });
 }
 
+// 單題看圖說句（語音，不呼叫 updateProgress / showResult）
 function renderMixSpeak(area, target, cb) {
-  initSpeakGame.__singleMode = { target: target, cb: cb };
-  initSpeakGame(area, [target, target, target, target]);
+  var supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+  var img = getRandomImage(target);
+  var sentence = (typeof getRandomSentence === 'function') ? getRandomSentence(target) : null;
+  if (!supported) {
+    // 不支援語音辨識：改用聽發音→點「我說好了」過關，不penalize
+    area.innerHTML = '<div class="speak-container">' +
+      (img ? '<img class="speak-image" src="' + img + '" alt="" onerror="this.style.display=\'none\'" />' : '') +
+      '<div class="speak-word">' + esc(target.word) + ' (' + esc(target.meaning) + ')</div>' +
+      '<button class="speak-mic" onclick="speakWord(\'' + esc(target.word) + '\',0.7)">🔊</button>' +
+      '<div class="speak-transcript">大聲跟著唸一次！</div>' +
+      '<button class="btn-primary" id="mixSpeakDone" style="margin-top:12px;">我說好了 ✓</button></div>';
+    document.getElementById('mixSpeakDone').addEventListener('click', function() { cb(true, { mistakes: 0 }); });
+    return;
+  }
+
+  area.innerHTML =
+    '<div class="speak-container">' +
+      (img ? '<img class="speak-image" src="' + img + '" alt="" onerror="this.style.display=\'none\'" />' : '') +
+      '<div class="speak-hint">用這個單字說一個句子：</div>' +
+      '<div class="speak-word">' + esc(target.word) + ' (' + esc(target.meaning) + ')</div>' +
+      (sentence ? '<div style="color:#999;font-size:.9em;margin-bottom:12px;">提示：' + esc(sentence) + '</div>' : '') +
+      '<button class="speak-mic" id="mixMicBtn" aria-label="開始錄音">🎙️</button>' +
+      '<div class="speak-transcript" id="mixTranscript">點麥克風開始說話...</div>' +
+    '</div>';
+
+  var micBtn = document.getElementById('mixMicBtn');
+  var transcriptEl = document.getElementById('mixTranscript');
+  var recognition = null;
+  var answered = false;
+
+  micBtn.addEventListener('click', function() {
+    if (answered) return;
+    if (recognition) { recognition.stop(); return; }
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
+    micBtn.classList.add('recording');
+    transcriptEl.textContent = '正在聽...';
+
+    recognition.onresult = function(e) {
+      var transcript = '';
+      for (var i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      transcriptEl.textContent = transcript || '...';
+      if (e.results[0].isFinal) {
+        answered = true;
+        var found = transcript.toLowerCase().indexOf(target.word.toLowerCase()) !== -1;
+        if (found) {
+          transcriptEl.innerHTML = '✅ <strong>' + esc(transcript) + '</strong>';
+          transcriptEl.style.background = '#e8f5e9';
+        } else {
+          transcriptEl.innerHTML = '💪 "' + esc(transcript) + '" — 試試包含 <strong>' + esc(target.word) + '</strong>';
+          transcriptEl.style.background = '#fff3e0';
+        }
+        var spokenWords = transcript.trim().split(/\s+/).filter(Boolean).length;
+        micBtn.classList.remove('recording');
+        recognition = null;
+        cb(found, { mistakes: found ? 0 : 1, spokenWords: spokenWords });
+      }
+    };
+    recognition.onerror = function() { transcriptEl.textContent = '聽不清楚，再試一次？'; micBtn.classList.remove('recording'); recognition = null; };
+    recognition.onend = function() { micBtn.classList.remove('recording'); if (recognition) recognition = null; };
+    recognition.start();
+  });
 }
 
 // ===== 金幣庫 =====

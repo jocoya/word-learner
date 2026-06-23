@@ -1,5 +1,43 @@
 // 線索偵探遊戲
 
+// 「認識新朋友」答對的慶祝效果：星星爆裂 + 圖片彈跳 + 歡呼音效
+function celebrateLearnCorrect(area, btnEl) {
+  // 音效：上升的歡呼三連音
+  try {
+    var c = new (window.AudioContext || window.webkitAudioContext)();
+    [523.25, 659.25, 783.99, 1046.5].forEach(function(f, i) {
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, c.currentTime + i * 0.09);
+      g.gain.exponentialRampToValueAtTime(0.3, c.currentTime + i * 0.09 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + i * 0.09 + 0.3);
+      o.connect(g); g.connect(c.destination);
+      o.start(c.currentTime + i * 0.09); o.stop(c.currentTime + i * 0.09 + 0.3);
+    });
+  } catch (e) {}
+
+  // 圖片彈跳
+  var img = area.querySelector('.learn2-img, .learn2-image, img');
+  if (img) { img.classList.remove('learn2-pop'); void img.offsetWidth; img.classList.add('learn2-pop'); }
+
+  // 星星 / emoji 爆裂
+  var host = area.querySelector('.learn2-card') || area;
+  host.style.position = host.style.position || 'relative';
+  var emojis = ['⭐', '🎉', '✨', '🌟', '💫', '🎊'];
+  for (var i = 0; i < 14; i++) {
+    var s = document.createElement('div');
+    s.className = 'learn2-burst';
+    s.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    var ang = (Math.PI * 2 / 14) * i + Math.random() * 0.5;
+    var dist = 90 + Math.random() * 120;
+    s.style.setProperty('--bx', Math.cos(ang) * dist + 'px');
+    s.style.setProperty('--by', (Math.sin(ang) * dist - 40) + 'px');
+    s.style.fontSize = (1 + Math.random() * 1.2) + 'em';
+    host.appendChild(s);
+    (function(el){ setTimeout(function(){ el.remove(); }, 1100); })(s);
+  }
+}
+
 // 詞性英文 → 中文
 var POS_ZH = {
   noun: '名詞', verb: '動詞', adj: '形容詞', adv: '副詞',
@@ -254,6 +292,9 @@ function initDetectiveGame(area, words) {
           if (!ok) {
             var r = area.querySelector('.learn2-choice[data-id="' + target.id + '"]');
             if (r) r.classList.add('correct');
+          } else {
+            // 答對的慶祝效果：星星爆裂 + 圖片彈跳 + 音效
+            if (typeof celebrateLearnCorrect === 'function') celebrateLearnCorrect(area, b);
           }
           speakWord(target.word, 0.6);
           area.querySelectorAll('.learn2-choice').forEach(function(x){ x.style.pointerEvents = 'none'; });

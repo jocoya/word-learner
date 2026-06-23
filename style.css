@@ -2071,6 +2071,52 @@ body {
 }
 .reward-fullscreen.show img { transform: scale(1); }
 
+/* ===== COIN_CAT / COIN_DOG +1 飄出 ===== */
+.coin-plus-one {
+  position: fixed; left: 50%; top: 55%; z-index: 10002;
+  transform: translate(-50%, -50%) scale(0.4);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  opacity: 0; pointer-events: none;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease, top 0.6s ease;
+}
+.coin-plus-one.show {
+  opacity: 1; top: 40%;
+  transform: translate(-50%, -50%) scale(1);
+}
+.coin-plus-one img {
+  width: 120px; height: 120px; object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.35));
+  animation: coinBob 0.7s ease-in-out infinite alternate;
+}
+.coin-plus-one span {
+  font-size: 2.6em; font-weight: 800; color: #FFD54F;
+  text-shadow: 0 3px 0 #E6A100, 0 0 12px rgba(255,213,79,0.8);
+}
+@keyframes coinBob {
+  from { transform: translateY(0) rotate(-6deg); }
+  to   { transform: translateY(-8px) rotate(6deg); }
+}
+
+/* ===== 認識新朋友 答對慶祝 ===== */
+.learn2-burst {
+  position: absolute; left: 50%; top: 45%;
+  pointer-events: none; z-index: 30;
+  transform: translate(-50%, -50%);
+  animation: learn2Burst 1s ease-out forwards;
+}
+@keyframes learn2Burst {
+  0%   { transform: translate(-50%, -50%) translate(0,0) scale(0.4); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(var(--bx), var(--by)) scale(1.1); opacity: 0; }
+}
+.learn2-pop { animation: learn2Pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes learn2Pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.25) rotate(-4deg); }
+  70%  { transform: scale(0.95) rotate(3deg); }
+  100% { transform: scale(1); }
+}
+
 
 /* ===== 首頁「認識新朋友」卡片 ===== */
 .profile-card.learn {
