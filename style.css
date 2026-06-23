@@ -2015,3 +2015,20 @@ body {
   font-size: 0.85em; padding: 5px; cursor: pointer;
 }
 .cloud-del:active { background: #c62828; }
+
+
+/* ===== 用例句生圖按鈕 ===== */
+.btn-genimg {
+  flex: 1;
+  padding: 14px;
+  font-size: 1.05em;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #EC407A, #F06292);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(236,64,122,0.35);
+}
+.btn-genimg:active { transform: scale(0.98); }
+.btn-genimg:disabled { opacity: 0.6; }

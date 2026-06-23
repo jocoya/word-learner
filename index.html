@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>英文單字學習樂園</title>
-  <link rel="stylesheet" href="style.css?v=37" />
+  <link rel="stylesheet" href="style.css?v=38" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#4A90D9" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -47,7 +47,7 @@
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v37</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v38</div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -83,7 +83,10 @@
       <div class="add-word-form">
         <div class="add-word-head">
           <h3>新增單字</h3>
-          <button class="btn-sm" onclick="openAISettings()">⚙️ AI 設定</button>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-sm" onclick="openAISettings()">⚙️ AI 設定</button>
+            <button class="btn-sm" onclick="openImgSettings()">🎨 生圖設定</button>
+          </div>
         </div>
         <div class="form-row">
           <input id="newWord" type="text" placeholder="英文單字" />
@@ -91,6 +94,9 @@
         </div>
         <div class="form-row">
           <button id="aiGenAllBtn_new" class="btn-genall" onclick="aiGenerateAll('new')">🤖 一鍵生成全部（意思+詞性+解釋+例句）</button>
+        </div>
+        <div class="form-row">
+          <button id="genImgBtn_new" class="btn-genimg" onclick="aiGenImageForWord('new')">🎨 用例句生圖（本地 AI）</button>
         </div>
         <div class="form-row">
           <select id="newPos">
@@ -247,6 +253,9 @@
         </div>
         <div class="form-row">
           <button id="aiGenAllBtn_exam" class="btn-genall" onclick="aiGenerateAll('exam')">🤖 一鍵生成全部（意思+詞性+解釋+例句）</button>
+        </div>
+        <div class="form-row">
+          <button id="genImgBtn_exam" class="btn-genimg" onclick="aiGenImageForWord('exam')">🎨 用例句生圖（本地 AI）</button>
         </div>
         <div class="form-row">
           <select id="examNewPos">
@@ -455,28 +464,29 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="db.js?v=37"></script>
-  <script src="fsrs-engine.js?v=37"></script>
-  <script src="ai.js?v=37"></script>
-  <script src="games/memory.js?v=37"></script>
-  <script src="games/listen.js?v=37"></script>
-  <script src="games/fillblank.js?v=37"></script>
-  <script src="games/spelling.js?v=37"></script>
-  <script src="games/speak.js?v=37"></script>
-  <script src="games/bubble.js?v=37"></script>
-  <script src="games/echo.js?v=37"></script>
-  <script src="games/flashlight.js?v=37"></script>
-  <script src="games/detective.js?v=37"></script>
-  <script src="games/match.js?v=37"></script>
-  <script src="games/cloze.js?v=37"></script>
-  <script src="app.js?v=37"></script>
-  <script src="coins.js?v=37"></script>
-  <script src="dev.js?v=37"></script>
-  <script src="cloud.js?v=37"></script>
-  <script src="patches.js?v=37"></script>
-  <script src="monster.js?v=37"></script>
+  <script src="db.js?v=38"></script>
+  <script src="fsrs-engine.js?v=38"></script>
+  <script src="ai.js?v=38"></script>
+  <script src="imagegen.js?v=38"></script>
+  <script src="games/memory.js?v=38"></script>
+  <script src="games/listen.js?v=38"></script>
+  <script src="games/fillblank.js?v=38"></script>
+  <script src="games/spelling.js?v=38"></script>
+  <script src="games/speak.js?v=38"></script>
+  <script src="games/bubble.js?v=38"></script>
+  <script src="games/echo.js?v=38"></script>
+  <script src="games/flashlight.js?v=38"></script>
+  <script src="games/detective.js?v=38"></script>
+  <script src="games/match.js?v=38"></script>
+  <script src="games/cloze.js?v=38"></script>
+  <script src="app.js?v=38"></script>
+  <script src="coins.js?v=38"></script>
+  <script src="dev.js?v=38"></script>
+  <script src="cloud.js?v=38"></script>
+  <script src="patches.js?v=38"></script>
+  <script src="monster.js?v=38"></script>
   <script>
-    var APP_VERSION = 'v37';
+    var APP_VERSION = 'v38';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號

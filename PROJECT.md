@@ -27,7 +27,9 @@
 firebase SDK (CDN)
 db.js            ← Firebase 初始化、IndexedDB CRUD、舊版 SM-2 演算法、getDueWords
 fsrs-engine.js   ← FSRS 演算法、多小孩進度分流、遊戲難度門檻
-ai.js            ← AI 統一介面 aiChat()（可切換 Ollama / LM Studio / 自訂後端）+ AI 設定面板
+ai.js            ← AI 統一介面 aiChat()（可切換 Ollama / LM Studio / 自訂後端）+ AI 設定面板 + 批次工具
+imagegen.js      ← 本地生圖（SwarmUI）：generateAndUploadImage() 用例句生圖→上傳 Storage→存 URL
+cloud.js         ← 雲端圖片管理（列出/刪除 Storage 圖、清孤兒圖）
 games/*.js       ← 11 個遊戲（memory, listen, fillblank, spelling, speak, bubble, echo, flashlight, detective, match, cloze）
 app.js           ← 全域狀態、頁面導航、單字/考試包管理、每日挑戰（舊版）、工具函式
 coins.js         ← 金幣庫、禮券、寶箱（覆蓋 app.js 的 renderCoinPage 等）

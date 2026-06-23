@@ -765,6 +765,7 @@ async function editWord(id) {
       </div>
       <div class="form-row">
         <button id="aiGenAllBtn_edit" class="btn-genall" onclick="aiGenerateAll('edit')">🤖 一鍵生成全部</button>
+        <button id="genImgBtn_edit" class="btn-genimg" onclick="aiGenImageForWord('edit')">🎨 生圖</button>
       </div>
       <div class="form-row">
         <select id="editPos">
