@@ -93,95 +93,72 @@ function renderGameCards() {
 }
 
 // 計算目前小孩「還沒學過（reps=0）」的字數，顯示誘因橫幅
-async function updateNewWordBanner() {
-  var banner = document.getElementById('newwordBanner');
-  if (!banner) return;
-  if (currentMode !== 'kid') { banner.hidden = true; return; }
+// 計算「認識期」的新朋友（reps=0 或 S<3，且有例句）
+async function getNewFriends() {
   var words = await dbGetByIndex('words', 'pool', 'permanent');
-  // 算還沒學過(reps=0)且有例句的新字
-  var newWords = [];
+  var result = [];
   for (var i = 0; i < words.length; i++) {
     var w = words[i];
     if (!w.sentences || !w.sentences.some(function(s){ return s && s.trim(); })) continue;
     var p = (typeof getProgressFor === 'function') ? await getProgressFor(w.id) : null;
-    if (!p) { newWords.push(w); continue; }
-    p = (typeof fsrsUpgrade === 'function') ? fsrsUpgrade(p) : p;
-    if (!p.reps || p.reps === 0) newWords.push(w);
+    var up = p ? ((typeof fsrsUpgrade === 'function') ? fsrsUpgrade(p) : p) : null;
+    var s = up ? (up.stability || 0) : 0;
+    var reps = up ? (up.reps || 0) : 0;
+    if (reps === 0 || s < 3) result.push(w); // 認識期
   }
-  if (newWords.length <= 0) {
-    banner.innerHTML = '<div class="newword-done">🎉 你已經認識所有的新朋友了！</div>';
-    banner.hidden = false;
-    return;
-  }
-  // 不顯示大數字，包裝成「有新朋友想認識你」
+  return result;
+}
+
+// 橫幅每日次數（每天 2 次）
+async function getBannerLearnCount() {
+  var s = await dbGet('settings', 'bannerLearn');
+  var today = getTodayStr();
+  if (!s || s.date !== today) return 0;
+  return s.count || 0;
+}
+async function incBannerLearnCount() {
+  var today = getTodayStr();
+  var s = await dbGet('settings', 'bannerLearn');
+  var count = (s && s.date === today) ? (s.count || 0) : 0;
+  await dbPut('settings', { key: 'bannerLearn', date: today, count: count + 1 });
+}
+
+async function updateNewWordBanner() {
+  var banner = document.getElementById('newwordBanner');
+  if (!banner) return;
+  // 挑戰 + 小寶貝模式都顯示
+  var newFriends = await getNewFriends();
+  var usedToday = await getBannerLearnCount();
+  // 沒新字、或今天已用 2 次 → 不顯示
+  if (newFriends.length <= 0 || usedToday >= 2) { banner.hidden = true; return; }
   banner.innerHTML =
-    '<button class="newword-cta" onclick="openLearnThemes()">' +
-      '<span class="newword-cta-icon">🦁</span>' +
+    '<button class="newword-cta" onclick="startBannerLearn()">' +
+      '<span class="newword-cta-icon">🦍</span>' +
       '<span class="newword-cta-text">有新朋友想認識你！</span>' +
       '<span class="newword-cta-go">去看看 →</span>' +
     '</button>';
   banner.hidden = false;
 }
 
-// 開啟主題選擇：列出有新字的標籤主題（各幾個新朋友），或「隨意認識」
-async function openLearnThemes() {
-  var words = await dbGetByIndex('words', 'pool', 'permanent');
-  // 收集新字 + 依標籤分組
-  var newWords = [];
-  for (var i = 0; i < words.length; i++) {
-    var w = words[i];
-    if (!w.sentences || !w.sentences.some(function(s){ return s && s.trim(); })) continue;
-    var p = (typeof getProgressFor === 'function') ? await getProgressFor(w.id) : null;
-    var pp = p ? ((typeof fsrsUpgrade === 'function') ? fsrsUpgrade(p) : p) : null;
-    if (!pp || !pp.reps || pp.reps === 0) newWords.push(w);
-  }
-  if (!newWords.length) { alert('目前沒有新朋友囉！'); return; }
-
-  // 依標籤統計
-  var themeCount = {};
-  var noTag = 0;
-  newWords.forEach(function(w) {
-    if (w.tags && w.tags.length) {
-      w.tags.forEach(function(t) { themeCount[t] = (themeCount[t] || 0) + 1; });
-    } else { noTag++; }
-  });
-  var themes = Object.keys(themeCount).sort(function(a, b){ return themeCount[b] - themeCount[a]; });
-
-  var modal = document.getElementById('modal-themes');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'modal-themes';
-    modal.className = 'modal';
-    document.body.appendChild(modal);
-  }
-  var html = '<div class="modal-content theme-picker">' +
-    '<h3>🦁 想認識哪一群新朋友？</h3>' +
-    '<div class="theme-grid">';
-  // 隨意認識
-  html += '<button class="theme-card theme-any" onclick="startLearnNewWords(null)">' +
-    '<div class="theme-emoji">🎲</div><div class="theme-name">隨意認識</div>' +
-    '<div class="theme-count">' + newWords.length + ' 個朋友</div></button>';
-  // 各主題
-  themes.forEach(function(t) {
-    html += '<button class="theme-card" onclick="startLearnNewWords(\'' + esc(t) + '\')">' +
-      '<div class="theme-emoji">🏷️</div><div class="theme-name">' + esc(t) + '</div>' +
-      '<div class="theme-count">' + themeCount[t] + ' 個朋友</div></button>';
-  });
-  if (noTag > 0) {
-    html += '<button class="theme-card" onclick="startLearnNewWords(\'__notag__\')">' +
-      '<div class="theme-emoji">❓</div><div class="theme-name">還沒分類</div>' +
-      '<div class="theme-count">' + noTag + ' 個朋友</div></button>';
-  }
-  html += '</div><button class="btn-ghost" onclick="hideModal(\'modal-themes\')">關閉</button></div>';
-  modal.innerHTML = html;
-  modal.hidden = false;
+// 橫幅版：認識 2 個新朋友 → 給 1 金幣，每天 2 次
+async function startBannerLearn() {
+  var newFriends = await getNewFriends();
+  if (!newFriends.length) { alert('目前沒有新朋友囉！'); return; }
+  await incBannerLearnCount();
+  window.detectiveLearnFirst = true;
+  window.learnThemeFilter = null;
+  window.learnConfig = { count: 2, reward: 'coin' };
+  startGame('detective');
 }
 
-// 開始認識新朋友：theme 為標籤名 / null(隨意) / '__notag__'(無標籤)
-function startLearnNewWords(theme) {
-  hideModal('modal-themes');
+// 首頁大按鈕版：認識 5 個新朋友（家長跟讀）→ 給 1 鑽石
+async function startHomeLearn() {
+  var newFriends = await getNewFriends();
+  if (!newFriends.length) { alert('目前沒有新朋友囉！所有單字都認識過了 🎉'); return; }
+  currentMode = 'kid';
   window.detectiveLearnFirst = true;
-  window.learnThemeFilter = theme || null;
+  window.learnThemeFilter = null;
+  window.learnConfig = { count: 5, reward: 'diamond' };
   startGame('detective');
 }
 

@@ -70,7 +70,8 @@ function initSpeakGame(area, words) {
             transcriptEl.innerHTML = `💪 "${transcript}" — 試試包含 <strong>${target.word}</strong>`;
             transcriptEl.style.background = '#fff3e0';
           }
-          updateProgress(target.id, found, 'speak', { mistakes: found ? 0 : 1 });
+          var spokenWords = transcript.trim().split(/\s+/).filter(Boolean).length;
+          updateProgress(target.id, found, 'speak', { mistakes: found ? 0 : 1, spokenWords: spokenWords });
           document.getElementById('gameScore').textContent = `${correct} / ${current + 1}`;
           micBtn.classList.remove('recording');
           recognition = null;

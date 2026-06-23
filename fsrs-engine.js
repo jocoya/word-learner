@@ -153,50 +153,58 @@ function fsrsReview(progress, rating) {
 
 // payload: { wordId, gameType, mistakes, timeUsed, hintUsed }
 // gameType: 'memory' | 'listen' | 'bubble' | 'spelling' | 'fillblank' | 'detective' | 'flashlight' | 'echo' | 'speak'
+// payload 可帶 mode:'baby'|'kid'（小寶貝模式全部最高給 Good）
 function gameToRating(payload) {
   var gt = payload.gameType;
   var m = payload.mistakes || 0;
   var t = payload.timeUsed || 0;
   var hint = payload.hintUsed || 0;
+  var isBaby = payload.mode === 'baby';
 
-  if (gt === 'memory') {
-    if (m === 0 && t < 3) return 4;
-    if (m === 0) return 3;
-    if (m === 1) return 2;
-    return 1;
-  }
-  if (gt === 'listen' || gt === 'flashlight') {
-    if (m > 0) return 1;
-    return t < 2 ? 4 : 3;
-  }
-  if (gt === 'bubble') {
-    if (m > 0) return 1;
-    return t < 1.5 ? 4 : 3;
-  }
+  // 難遊戲：做對代表真的熟，可給 Easy(4)
+  // spelling 拼字 / cloze 讀句 / detective 猜字 / fillblank 句子排列 / speak 造句
   if (gt === 'spelling') {
+    if (isBaby) return m === 0 ? 3 : (m >= 2 ? 1 : 2);
     if (m === 0 && hint === 0) return 4;
     if (m === 1 || hint === 1) return 2;
     if (m >= 2) return 1;
     return 3;
   }
-  if (gt === 'fillblank' || gt === 'detective') {
+  if (gt === 'cloze' || gt === 'detective') {
+    if (m === 0) return isBaby ? 3 : 4;
+    return 1;
+  }
+  if (gt === 'fillblank') {
+    if (m === 0) return isBaby ? 3 : 4;
+    if (m === 1) return 2;
+    return 1;
+  }
+  if (gt === 'speak') {
+    // 看圖說句：依「有沒有講到目標字 + 句子完整度」評分
+    // payload.spokenWords = 說出的字數；有講到字 + 完整句子(>=3字) → Easy
+    if (m > 0) return 1; // 沒講到目標字
+    if (isBaby) return 3;
+    var sw = payload.spokenWords || 0;
+    return sw >= 3 ? 4 : 3; // 完整句子給 Easy，只講單字/太短給 Good
+  }
+
+  // 簡單遊戲：最高只給 Good(3)，因為太容易、有猜的成分
+  if (gt === 'memory') {
     if (m === 0) return 3;
     if (m === 1) return 2;
     return 1;
   }
-  if (gt === 'cloze') {
-    // 讀句選字：情境記憶，答對給 Good，錯給 Again
-    if (m === 0) return 3;
-    return 1;
+  if (gt === 'listen' || gt === 'flashlight') {
+    return m > 0 ? 1 : 3;
+  }
+  if (gt === 'bubble') {
+    return m > 0 ? 1 : 3;
+  }
+  if (gt === 'echo') {
+    return m === 0 ? 3 : 1;
   }
   if (gt === 'match') {
-    // 連連看：配對成功給 Good，配錯給 Again
-    if (m === 0) return 3;
-    return 1;
-  }
-  if (gt === 'echo' || gt === 'speak') {
-    if (m === 0) return 3;
-    return 1;
+    return m === 0 ? 3 : 1;
   }
   return 3;
 }

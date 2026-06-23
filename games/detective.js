@@ -34,17 +34,21 @@ function buildLetterSkeleton(word, revealCount) {
 function initDetectiveGame(area, words) {
   var supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
   var withSentence = words.filter(function(w) { return w.sentences && w.sentences.length > 0; });
-  if (withSentence.length < 4) {
+
+  // 「認識新朋友」入口設定（由 app.js 設定全域）
+  var learnFirst = (typeof window !== 'undefined' && window.detectiveLearnFirst);
+  var learnConfig = (typeof window !== 'undefined' && window.learnConfig) ? window.learnConfig : null;
+  var themeFilter = (typeof window !== 'undefined') ? window.learnThemeFilter : null;
+  window.detectiveLearnFirst = false; // 用完即清
+  window.learnThemeFilter = null;
+  window.learnConfig = null;
+
+  // 一般偵探模式：要至少 4 個有例句的字
+  if (!learnFirst && withSentence.length < 4) {
     area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有例句的單字！</p>';
     return;
   }
   var total = Math.min(8, withSentence.length);
-
-  // 建立佇列：若從「認識新字」入口進來，優先排新字（S=0）
-  var learnFirst = (typeof window !== 'undefined' && window.detectiveLearnFirst);
-  var themeFilter = (typeof window !== 'undefined') ? window.learnThemeFilter : null;
-  window.detectiveLearnFirst = false; // 用完即清
-  window.learnThemeFilter = null;
 
   // 若有主題篩選，先把單字池縮到該主題
   if (learnFirst && themeFilter) {
@@ -52,26 +56,32 @@ function initDetectiveGame(area, words) {
       if (themeFilter === '__notag__') return !w.tags || w.tags.length === 0;
       return w.tags && w.tags.indexOf(themeFilter) !== -1;
     });
-    if (withSentence.length < 1) { withSentence = words.filter(function(w){ return w.sentences && w.sentences.length; }); }
   }
-  total = Math.min(8, withSentence.length);
 
   var current = 0, correct = 0;
   var queue;
   var learnedFriends = []; // 這場認識的新朋友（學習模式用）
+  var learnReward = learnConfig ? learnConfig.reward : 'coin';   // 'coin' | 'diamond'
+  var learnCount = learnConfig ? learnConfig.count : 2;          // 認識幾個新朋友
 
   function buildQueueAndStart() {
     if (learnFirst) {
-      // 依 stability 把新字排前面
+      // 只挑「認識期」的字（reps=0 或 S<3），優先沒學過的
       var enriched = [];
       var pending = withSentence.length;
+      if (pending === 0) { noNewFriends(); return; }
       withSentence.forEach(function(w) {
-        getWordStability(w.id).then(function(s) {
-          enriched.push({ w: w, s: s });
+        getProgressFor(w.id).then(function(p) {
+          var up = p ? (typeof fsrsUpgrade === 'function' ? fsrsUpgrade(p) : p) : null;
+          var s = up ? (up.stability || 0) : 0;
+          var reps = up ? (up.reps || 0) : 0;
+          // 認識期：還沒學過(reps=0) 或 S<3
+          if (reps === 0 || s < 3) enriched.push({ w: w, s: s, reps: reps });
           if (--pending === 0) {
-            var news = shuffleArray(enriched.filter(function(x){ return !x.s || x.s <= 0; }));
-            var olds = shuffleArray(enriched.filter(function(x){ return x.s > 0; }));
-            queue = news.concat(olds).slice(0, total).map(function(x){ return x.w; });
+            // reps=0 全新優先，其次 S 低的
+            enriched.sort(function(a, b){ return (a.reps - b.reps) || (a.s - b.s); });
+            queue = enriched.slice(0, learnCount).map(function(x){ return x.w; });
+            if (queue.length === 0) { noNewFriends(); return; }
             renderRound();
           }
         });
@@ -82,10 +92,19 @@ function initDetectiveGame(area, words) {
     }
   }
 
+  function noNewFriends() {
+    area.innerHTML = '<div style="text-align:center;padding:60px 20px;">' +
+      '<div style="font-size:4em;">🎉</div>' +
+      '<div style="font-size:1.4em;color:#43A047;font-weight:700;margin-top:12px;">目前沒有新朋友了！</div>' +
+      '<div style="color:#999;margin-top:8px;">所有單字都認識過囉，去玩遊戲鞏固記憶吧</div>' +
+      '<button class="btn-primary" style="margin-top:20px;" onclick="goTo(\'page-home\')">回首頁</button>' +
+    '</div>';
+  }
+
   function renderRound() {
     if (current >= queue.length) {
-      // 學習模式入口：結算「今天認識了 N 個新朋友」+ 獎勵
-      if (learnFirst && learnedFriends.length > 0) { showLearnSummary(); return; }
+      // 學習模式入口：結算 + 獎勵
+      if (learnFirst) { showLearnSummary(); return; }
       showResult(correct, total);
       return;
     }
@@ -99,39 +118,37 @@ function initDetectiveGame(area, words) {
     });
   }
 
-  // 認識新朋友結算
-  function showLearnSummary() {
-    var div = document.createElement('div');
-    div.className = 'learn-summary';
-    var coinImg = (typeof currentChild !== 'undefined' && currentChild === 'girl') ? './images/COIN_DOG.png' : './images/COIN_CAT.png';
-    div.innerHTML = '<div class="learn-summary-box">' +
-      '<div class="learn-summary-title">🎉 認識了 ' + learnedFriends.length + ' 個新朋友！</div>' +
-      '<div class="learn-summary-friends">' +
-        learnedFriends.map(function(w){
-          var img = getRandomImage(w);
-          return '<div class="learn-summary-friend">' +
-            (img ? '<img src="' + img + '" alt="">' : '<div style="font-size:2em">🆕</div>') +
-            '<span>' + esc(w.word) + '</span></div>';
-        }).join('') +
-      '</div>' +
-      '<div class="learn-summary-reward"><img src="' + coinImg + '" style="width:28px;vertical-align:middle"> +' + learnedFriends.length + ' 金幣</div>' +
-      '<button class="btn-primary" onclick="this.closest(\'.learn-summary\').remove(); goTo(\'page-games\');">太棒了！</button>' +
-    '</div>';
-    document.body.appendChild(div);
-    setTimeout(function(){ div.classList.add('show'); }, 30);
-    // 給金幣（每個新朋友 +1，測試模式不給）
-    if (!(typeof devSkipRewards === 'function' && devSkipRewards())) {
-      giveLearnCoins(learnedFriends.length);
+  // 認識新朋友結算：給獎勵（金幣或鑽石）+ 滿版獎勵圖
+  async function showLearnSummary() {
+    if (learnedFriends.length === 0) {
+      // 沒認識到任何（理論上不會），直接回首頁
+      goTo('page-home'); return;
     }
-  }
-
-  async function giveLearnCoins(n) {
-    if (typeof getCoins !== 'function') return;
-    var coins = await getCoins();
     var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
-    coins[child] = (coins[child] || 0) + n;
-    coins.log.push({ role: child, count: n, date: getTodayStr(), chest: '🦁 認識 ' + n + ' 個新朋友' });
-    await saveCoins(coins);
+    var devSkip = (typeof devSkipRewards === 'function' && devSkipRewards());
+
+    if (!devSkip && typeof getCoins === 'function') {
+      var coins = await getCoins();
+      if (learnReward === 'diamond') {
+        // 首頁版：給 1 顆鑽石
+        var field = child === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
+        coins[field] = coins[field] || {};
+        coins[field]['diamond'] = (coins[field]['diamond'] || 0) + 1;
+        coins.log.push({ role: child, count: 0, date: getTodayStr(), chest: '💎 認識 ' + learnedFriends.length + ' 個新朋友' });
+      } else {
+        // 橫幅版：給 1 金幣
+        coins[child] = (coins[child] || 0) + 1;
+        coins.log.push({ role: child, count: 1, date: getTodayStr(), chest: '🦍 認識新朋友' });
+      }
+      await saveCoins(coins);
+    }
+
+    // 滿版獎勵圖（點擊才消失），消失後回首頁
+    if (typeof showRewardImage === 'function') {
+      showRewardImage(learnReward === 'diamond' ? 'diamond' : 'coin', function() { goTo('page-home'); });
+    } else {
+      goTo('page-home');
+    }
   }
 
   // ===== 學習模式（新字）：多感官流程 看→聽→跟讀→動作(TPR)→例句→確認 =====

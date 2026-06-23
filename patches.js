@@ -46,7 +46,30 @@ async function getGameWords(gameType) {
   }
 
   if (words.length < 4) { alert('單字不夠，至少需要 4 個！'); return null; }
-  return shuffleArray(words);
+
+  // 優先鞏固「剛學過的新字」+ FSRS 到期的字（排前面）
+  // 規則：due（快忘）最優先，其次剛學過(reps 少且 S 低)，其餘隨機
+  words = shuffleArray(words);
+  if (source !== 'exam-multi' && source.indexOf('exam-') !== 0) {
+    var now = Date.now();
+    var scored = [];
+    for (var pi = 0; pi < words.length; pi++) {
+      var pr = (typeof getProgressFor === 'function') ? await getProgressFor(words[pi].id) : null;
+      var pup = pr ? ((typeof fsrsUpgrade === 'function') ? fsrsUpgrade(pr) : pr) : null;
+      var pri = 2; // 預設：一般
+      if (pup) {
+        var due = pup.due || 0;
+        var s = pup.stability || 0;
+        var reps = pup.reps || 0;
+        if (due && due <= now) pri = 0;           // 到期快忘 → 最優先
+        else if (reps >= 1 && s < 8) pri = 1;     // 剛學過、還在鞏固 → 次優先
+      }
+      scored.push({ w: words[pi], pri: pri, r: Math.random() });
+    }
+    scored.sort(function(a, b){ return (a.pri - b.pri) || (a.r - b.r); });
+    words = scored.map(function(x){ return x.w; });
+  }
+  return words;
 }
 
 // ===== 每日挑戰：固定流程 + FSRS 區段篩選 + 程度自適應 =====
@@ -443,7 +466,9 @@ updateProgress = async function(wordId, correct, gameType, extra) {
       gameType: gameType,
       mistakes: extra && extra.mistakes != null ? extra.mistakes : (correct ? 0 : 1),
       timeUsed: extra && extra.timeUsed != null ? extra.timeUsed : 0,
-      hintUsed: extra && extra.hintUsed != null ? extra.hintUsed : 0
+      hintUsed: extra && extra.hintUsed != null ? extra.hintUsed : 0,
+      mode: (typeof currentMode !== 'undefined') ? currentMode : 'kid',
+      spokenWords: extra && extra.spokenWords != null ? extra.spokenWords : 0
     };
     return await finishWordRound(payload);
   }

@@ -186,3 +186,19 @@ function renderCalendar(completedDates) {
   h += '</div>';
   document.getElementById('calendarSection').innerHTML = h;
 }
+
+
+// ===== 滿版獎勵圖片（點擊才消失）=====
+// type: 'coin' → give C.png；'diamond' → give D.png
+function showRewardImage(type, onClose) {
+  var img = type === 'diamond' ? './images/give D.png' : './images/give C.png';
+  var div = document.createElement('div');
+  div.className = 'reward-fullscreen';
+  div.innerHTML = '<img src="' + encodeURI(img) + '" alt="獎勵">';
+  div.addEventListener('click', function() {
+    div.classList.remove('show');
+    setTimeout(function() { div.remove(); if (onClose) onClose(); }, 300);
+  });
+  document.body.appendChild(div);
+  setTimeout(function() { div.classList.add('show'); }, 30);
+}
