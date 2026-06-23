@@ -152,12 +152,12 @@ async function startBannerLearn() {
   await startLearnSession({ count: 2, reward: 'coin', milestone: 0 });
 }
 
-// 首頁大按鈕版：認識 5 個新朋友（家長跟讀）→ 給 1 鑽石，每認識 3 個跳「💎 +1」動畫
+// 首頁大按鈕版：認識 5 個新朋友（家長跟讀）→ 全部完成才跳滿版圖，點圖後給 1 鑽石
 async function startHomeLearn() {
   var newFriends = await getNewFriends();
   if (!newFriends.length) { alert('目前沒有新朋友囉！所有單字都認識過了 🎉'); return; }
   currentMode = 'kid';
-  await startLearnSession({ count: 5, reward: 'diamond', milestone: 3 });
+  await startLearnSession({ count: 5, reward: 'diamond', milestone: 0 });
 }
 
 async function getGameWords() {

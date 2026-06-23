@@ -206,12 +206,17 @@ function playRewardChime() {
   } catch (e) {}
 }
 
-function showCoinPlusOne() {
-  var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
-  var coinImg = child === 'girl' ? './images/COIN_DOG.png' : './images/COIN_CAT.png';
+function showCoinPlusOne(type) {
   var wrap = document.createElement('div');
   wrap.className = 'coin-plus-one';
-  wrap.innerHTML = '<img src="' + encodeURI(coinImg) + '" alt="coin"><span>+1</span>';
+  if (type === 'diamond') {
+    // 鑽石：用 emoji 顯示 💎 +1
+    wrap.innerHTML = '<div class="coin-plus-diamond">💎</div><span>+1</span>';
+  } else {
+    var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+    var coinImg = child === 'girl' ? './images/COIN_DOG.png' : './images/COIN_CAT.png';
+    wrap.innerHTML = '<img src="' + encodeURI(coinImg) + '" alt="coin"><span>+1</span>';
+  }
   document.body.appendChild(wrap);
   setTimeout(function() { wrap.classList.add('show'); }, 30);
   setTimeout(function() { wrap.classList.remove('show'); }, 1600);
@@ -226,7 +231,7 @@ function showRewardImage(type, onClose) {
   div.addEventListener('click', function() {
     div.classList.remove('show');
     playRewardChime();
-    showCoinPlusOne();
+    showCoinPlusOne(type);
     setTimeout(function() { div.remove(); if (onClose) onClose(); }, 300);
   });
   document.body.appendChild(div);

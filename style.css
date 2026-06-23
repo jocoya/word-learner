@@ -2088,6 +2088,11 @@ body {
   filter: drop-shadow(0 6px 14px rgba(0,0,0,0.35));
   animation: coinBob 0.7s ease-in-out infinite alternate;
 }
+.coin-plus-diamond {
+  font-size: 110px; line-height: 1;
+  filter: drop-shadow(0 6px 14px rgba(0,188,212,0.5));
+  animation: coinBob 0.7s ease-in-out infinite alternate;
+}
 .coin-plus-one span {
   font-size: 2.6em; font-weight: 800; color: #FFD54F;
   text-shadow: 0 3px 0 #E6A100, 0 0 12px rgba(255,213,79,0.8);
