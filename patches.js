@@ -351,16 +351,67 @@ function runBubbleSegment(area, words, doneCb) {
 }
 
 // ===== 圖片預載 =====
-function preloadImages(words) {
+// 回傳 Promise：所有圖片載入完成（或逾時）才 resolve。
+// 已快取的圖片會「立即」完成（onload 同步觸發），所以不會有等待感。
+function preloadImages(words, maxWaitMs) {
+  var urls = [];
   words.forEach(function(w) {
-    var imgs = getAllImages(w);
-    imgs.forEach(function(url) {
-      if (url && url.indexOf('http') === 0) {
-        var img = new Image();
-        img.src = url;
-      }
+    getAllImages(w).forEach(function(url) {
+      if (url && (url.indexOf('http') === 0 || url.indexOf('data:') === 0)) urls.push(url);
     });
   });
+  urls = urls.filter(function(u, i) { return urls.indexOf(u) === i; });
+  if (urls.length === 0) return Promise.resolve();
+
+  var loaded = 0;
+  return new Promise(function(resolve) {
+    var done = false;
+    function finish() { if (!done) { done = true; resolve(); } }
+    urls.forEach(function(url) {
+      var img = new Image();
+      img.onload = img.onerror = function() {
+        loaded++;
+        if (loaded >= urls.length) finish();
+      };
+      img.src = url;
+      // 已在瀏覽器/SW 快取的圖片，complete 會立刻是 true
+      if (img.complete) { loaded++; if (loaded >= urls.length) finish(); }
+    });
+    // 保險：最多等 maxWaitMs（預設 2.5 秒），避免網路慢時卡死
+    setTimeout(finish, maxWaitMs || 2500);
+  });
+}
+
+// 把整個永久庫的圖片預先抓進快取（背景執行，讓之後離線也能玩）
+var _precacheDone = false;
+async function precacheAllWordImages() {
+  if (_precacheDone) return;
+  _precacheDone = true;
+  try {
+    var words = await dbGetByIndex('words', 'pool', 'permanent');
+    var urls = [];
+    words.forEach(function(w) {
+      getAllImages(w).forEach(function(url) {
+        if (url && url.indexOf('http') === 0) urls.push(url);
+      });
+    });
+    urls = urls.filter(function(u, i) { return urls.indexOf(u) === i; });
+    // 一次抓幾張，避免一次塞爆網路
+    var idx = 0, BATCH = 4;
+    function next() {
+      if (idx >= urls.length) return;
+      var batch = urls.slice(idx, idx + BATCH);
+      idx += BATCH;
+      Promise.all(batch.map(function(url) {
+        return new Promise(function(res) {
+          var img = new Image();
+          img.onload = img.onerror = function() { res(); };
+          img.src = url;
+        });
+      })).then(function() { setTimeout(next, 150); });
+    }
+    next();
+  } catch (e) { /* 靜默 */ }
 }
 
 // 覆蓋 startGame 加入預載 + 難度門檻
@@ -368,16 +419,14 @@ var _originalStartGame = startGame;
 startGame = async function(gameId) {
   var words = await getGameWords(gameId);
   if (!words) return;
-  // 預載圖片
-  preloadImages(words);
   currentGameWords = words;
   document.getElementById('gameTitle').textContent = GAMES.find(function(g){return g.id===gameId;}).name;
   document.getElementById('gameScore').textContent = '';
   goTo('page-game');
   var area = document.getElementById('gameArea');
   area.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">載入中...</div>';
-  // 等一下讓圖片有時間載入
-  setTimeout(function() {
+  // 真正等圖片載入完成（已快取的會秒開，不會空等 500ms）
+  preloadImages(words).then(function() {
     area.innerHTML = '';
     switch (gameId) {
       case 'memory':    initMemoryGame(area, words, currentMode); break;
@@ -392,7 +441,7 @@ startGame = async function(gameId) {
       case 'match':     initMatchGame(area, words); break;
       case 'cloze':     initClozeGame(area, words); break;
     }
-  }, 500);
+  });
 };
 
 // ===== FSRS 整合的多巴胺系統 =====
@@ -506,6 +555,18 @@ startGame = async function(gameId) {
 // ===== 啟動：載入上次選的小孩 =====
 if (typeof loadCurrentChild === 'function') {
   loadCurrentChild();
+}
+
+// ===== 啟動後：背景把所有單字圖片抓進快取（之後離線也能玩、秒開）=====
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', function() {
+    // 延遲一點，先讓首頁與資料載入完成，再背景預抓圖片
+    setTimeout(function() {
+      if (navigator.onLine && typeof precacheAllWordImages === 'function') {
+        precacheAllWordImages();
+      }
+    }, 3000);
+  });
 }
 
 
