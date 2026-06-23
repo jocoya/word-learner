@@ -103,17 +103,47 @@ async function swarmGenerate(prompt) {
 // 把 SwarmUI 生的圖抓下來變 blob → 上傳 Firebase Storage → 回傳永久 URL
 async function generateAndUploadImage(prompt, wordForName) {
   var swarmUrl = await swarmGenerate(prompt);
-  // 抓圖
-  var res = await imgFetch(swarmUrl, { method: 'GET' }, 60000);
-  if (!res.ok) throw new Error('下載生成圖失敗 HTTP ' + res.status);
-  var blob = await res.blob();
-  // 上傳 Storage（複用 db.js 的 storage）
   var safe = (wordForName || 'gen').toLowerCase().replace(/[^a-z0-9]/g, '_');
   var filename = 'gen_' + safe + '_' + Date.now() + '.png';
   var ref = storage.ref('word_images/' + filename);
-  var snap = await ref.put(blob, { contentType: 'image/png' });
-  var downloadUrl = await snap.ref.getDownloadURL();
-  return downloadUrl;
+
+  // 先試直接 fetch 抓 blob（最乾淨）
+  try {
+    var res = await imgFetch(swarmUrl, { method: 'GET' }, 60000);
+    if (res.ok) {
+      var blob = await res.blob();
+      var snap = await ref.put(blob, { contentType: 'image/png' });
+      return await snap.ref.getDownloadURL();
+    }
+  } catch (e) {
+    // fetch 被 CORS 擋 → 改用 canvas 繞過
+  }
+
+  // 後備：用 canvas 把圖畫出來再轉 blob（繞過 CORS，同 db.js 的 uploadViaCanvas 手法）
+  var blob2 = await imageUrlToBlobViaCanvas(swarmUrl);
+  var snap2 = await ref.put(blob2, { contentType: 'image/png' });
+  return await snap2.ref.getDownloadURL();
+}
+
+// 用 <img> + canvas 把跨來源圖片轉成 blob（瀏覽器載 img 不受 CORS 阻擋）
+function imageUrlToBlobViaCanvas(url) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+      try {
+        var canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.toBlob(function(b) {
+          if (b) resolve(b); else reject(new Error('canvas toBlob 失敗'));
+        }, 'image/png');
+      } catch (e) { reject(new Error('canvas 轉檔失敗（可能圖片來源未允許 CORS）：' + e.message)); }
+    };
+    img.onerror = function() { reject(new Error('圖片載入失敗：' + url)); };
+    img.src = url;
+  });
 }
 
 // 測試 SwarmUI 連線
