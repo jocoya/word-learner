@@ -93,20 +93,24 @@ function renderGameCards() {
 }
 
 // 計算目前小孩「還沒學過（reps=0）」的字數，顯示誘因橫幅
-// 計算「認識期」的新朋友（reps=0 或 S<3，且有例句）
+// 計算「認識期」的新朋友（reps=0 或 S<3）
+// 註：例句非必要（學習流程的「例句」步驟會在沒例句時自動略過），
+//     但有例句的字優先排前面，學習體驗較完整
 async function getNewFriends() {
   var words = await dbGetByIndex('words', 'pool', 'permanent');
-  var result = [];
+  var withSen = [], without = [];
   for (var i = 0; i < words.length; i++) {
     var w = words[i];
-    if (!w.sentences || !w.sentences.some(function(s){ return s && s.trim(); })) continue;
     var p = (typeof getProgressFor === 'function') ? await getProgressFor(w.id) : null;
     var up = p ? ((typeof fsrsUpgrade === 'function') ? fsrsUpgrade(p) : p) : null;
     var s = up ? (up.stability || 0) : 0;
     var reps = up ? (up.reps || 0) : 0;
-    if (reps === 0 || s < 3) result.push(w); // 認識期
+    if (reps === 0 || s < 3) { // 認識期
+      var hasSen = w.sentences && w.sentences.some(function(x){ return x && x.trim(); });
+      if (hasSen) withSen.push(w); else without.push(w);
+    }
   }
-  return result;
+  return withSen.concat(without); // 有例句的排前面
 }
 
 // 橫幅每日次數（每天 2 次）
@@ -140,26 +144,20 @@ async function updateNewWordBanner() {
   banner.hidden = false;
 }
 
-// 橫幅版：認識 2 個新朋友 → 給 1 金幣，每天 2 次
+// 橫幅版：認識 2 個新朋友 → 給 1 金幣，每天 2 次（獨立模組，不再經過線索偵探）
 async function startBannerLearn() {
   var newFriends = await getNewFriends();
   if (!newFriends.length) { alert('目前沒有新朋友囉！'); return; }
   await incBannerLearnCount();
-  window.detectiveLearnFirst = true;
-  window.learnThemeFilter = null;
-  window.learnConfig = { count: 2, reward: 'coin' };
-  startGame('detective');
+  await startLearnSession({ count: 2, reward: 'coin', milestone: 0 });
 }
 
-// 首頁大按鈕版：認識 5 個新朋友（家長跟讀）→ 給 1 鑽石
+// 首頁大按鈕版：認識 5 個新朋友（家長跟讀）→ 給 1 鑽石，每認識 3 個跳「💎 +1」動畫
 async function startHomeLearn() {
   var newFriends = await getNewFriends();
   if (!newFriends.length) { alert('目前沒有新朋友囉！所有單字都認識過了 🎉'); return; }
   currentMode = 'kid';
-  window.detectiveLearnFirst = true;
-  window.learnThemeFilter = null;
-  window.learnConfig = { count: 5, reward: 'diamond' };
-  startGame('detective');
+  await startLearnSession({ count: 5, reward: 'diamond', milestone: 3 });
 }
 
 async function getGameWords() {

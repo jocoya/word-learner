@@ -1,6 +1,6 @@
-const CACHE = 'word-learner-v47';
+const CACHE = 'word-learner-v48';
 const MEDIA_CACHE = 'word-learner-media'; // 圖片/音檔（跨版本保留，不隨程式更新清掉）
-const V = '?v=47';
+const V = '?v=48';
 const ASSETS = [
   './index.html',
   './style.css' + V,
@@ -25,6 +25,7 @@ const ASSETS = [
   './games/detective.js' + V,
   './games/match.js' + V,
   './games/cloze.js' + V,
+  './games/learn.js' + V,
   './images/lion.png',
   './manifest.json',
   './icon.svg'
