@@ -74,7 +74,14 @@ function fsrsInitProgress(wordId) {
 
 // 把舊的 progress 升級成 FSRS 格式（向後相容）
 function fsrsUpgrade(progress) {
-  if (typeof progress.stability !== 'undefined') return progress;
+  if (typeof progress.stability !== 'undefined') {
+    // 數值防呆：清掉壞掉的 stability（NaN / Infinity / 暴衝的天文數字）
+    if (!isFinite(progress.stability) || isNaN(progress.stability) || progress.stability > STABILITY_MAX) {
+      progress = Object.assign({}, progress, { stability: Math.min(STABILITY_MAX, (progress.reps > 0 ? 3 : 0)) });
+    }
+    if (progress.stability < 0) progress = Object.assign({}, progress, { stability: 0 });
+    return progress;
+  }
   // 從舊資料推估 FSRS 值
   var s = (progress.streak || 0) >= 1 ? Math.max(1, progress.interval || 1) : 0;
   var d = 5;
@@ -84,6 +91,24 @@ function fsrsUpgrade(progress) {
     state: progress.streak > 0 ? 'review' : 'new',
     due: progress.nextReview || Date.now()
   });
+}
+
+// 數值防呆：把 stability 限制在合理範圍，並限制單次成長倍數
+// - 過濾 NaN / Infinity（壞資料 → 退回前值或 0.1）
+// - 上限 36500（約 100 年），下限 0.01
+// - 單次複習成長不超過前值的 3 倍 + 5（避免任何公式暴衝）
+var STABILITY_MAX = 36500;
+function fsrsClampStability(newS, prevS) {
+  if (newS == null || !isFinite(newS) || isNaN(newS)) {
+    return (prevS != null && isFinite(prevS) && prevS > 0) ? prevS : 0.1;
+  }
+  if (newS < 0.01) newS = 0.01;
+  if (prevS != null && isFinite(prevS) && prevS > 0) {
+    var cap = prevS * 3 + 5; // 單次最多成長到 3 倍 +5
+    if (newS > cap) newS = cap;
+  }
+  if (newS > STABILITY_MAX) newS = STABILITY_MAX;
+  return newS;
 }
 
 // FSRS 核心：根據評分（1-4）更新 S 和 D
@@ -100,6 +125,8 @@ function fsrsReview(progress, rating) {
   if (progress.reps === 0) {
     // 第一次複習：使用初始值，但大幅壓低避免暴衝
     newS = w[rating - 1] * FIRST_PLAY_SCALE; // w0~w3 對應 Again/Hard/Good/Easy
+    // 首玩封頂：第一次接觸絕不直接跳過「認識期」（必須改天再複習才會升級）
+    newS = Math.min(newS, STAGE_THRESHOLDS[0].s * 0.8);
     newD = w[4] - (rating - 3) * w[5];
     newD = Math.max(1, Math.min(10, newD));
   } else {
@@ -129,6 +156,10 @@ function fsrsReview(progress, rating) {
     newD = w[7] * 5 + (1 - w[7]) * newD;
     newD = Math.max(1, Math.min(10, newD));
   }
+
+  // 數值防呆：避免 NaN / Infinity / 暴衝（最高約 100 年），下限 0.01
+  newS = fsrsClampStability(newS, progress.stability);
+  if (!isFinite(newD)) newD = 5;
 
   // 計算下次複習日（基於目標保留率 90%）
   var intervalDays = newS * (Math.pow(REQUEST_RETENTION, 1 / DECAY) - 1) / FACTOR;

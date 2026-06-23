@@ -298,14 +298,16 @@ function initDetectiveGame(area, words) {
           }
           speakWord(target.word, 0.6);
           area.querySelectorAll('.learn2-choice').forEach(function(x){ x.style.pointerEvents = 'none'; });
-          setTimeout(finishLearn, 1500);
+          setTimeout(function(){ finishLearn(ok); }, 1500);
         });
       });
     }
 
-    function finishLearn() {
-      // 學習模式給輕量初始進度（reps=0 首玩會被 FIRST_PLAY_SCALE 壓低，不暴衝）
-      updateProgress(target.id, true, 'detective', { mistakes: 0 });
+    function finishLearn(wasCorrect) {
+      // 認識新朋友：依確認題對錯記錄（reps=0 首玩會被首玩封頂壓在認識期，不暴衝）
+      // 沒作答（例如沒有 confirm 步驟）預設視為答對
+      var correct = (wasCorrect !== false);
+      updateProgress(target.id, correct, 'detective', { mistakes: correct ? 0 : 1 });
       learnedFriends.push(target);
       current++;
       renderRound();
