@@ -1996,3 +1996,22 @@ body {
 .learn-summary-friend img { width: 70px; height: 70px; object-fit: contain; border-radius: 10px; }
 .learn-summary-friend span { font-size: 0.85em; color: #4A90D9; font-weight: 600; }
 .learn-summary-reward { font-size: 1.2em; color: #FF9800; font-weight: 700; margin: 10px 0; }
+
+
+/* ===== 雲端圖片管理 ===== */
+.cloud-mgr { max-width: 560px; max-height: 86vh; overflow-y: auto; }
+.cloud-summary { background: #f5f5f5; border-radius: 8px; padding: 10px; font-size: 0.95em; color: #444; margin-bottom: 10px; }
+.cloud-actions { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.cloud-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.cloud-item {
+  position: relative; border: 2px solid #ddd; border-radius: 10px; overflow: hidden;
+  background: #fafafa; display: flex; flex-direction: column;
+}
+.cloud-item.orphan { border-color: #f44336; }
+.cloud-item img { width: 100%; height: 90px; object-fit: cover; }
+.cloud-item-info { font-size: 0.75em; color: #777; padding: 3px 5px; }
+.cloud-del {
+  border: none; background: #f44336; color: #fff;
+  font-size: 0.85em; padding: 5px; cursor: pointer;
+}
+.cloud-del:active { background: #c62828; }
