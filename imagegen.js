@@ -114,7 +114,8 @@ async function generateAndUploadImage(prompt, wordForName) {
   var filename = 'gen_' + safe + '_' + Date.now() + '.png';
   var ref = storage.ref('word_images/' + filename);
 
-  // 先試直接 fetch 抓 blob（最乾淨）
+  // 直接 fetch 抓 blob（URL 已編碼）→ 上傳
+  var fetchErr = '';
   try {
     var res = await imgFetch(swarmUrl, { method: 'GET' }, 60000);
     if (res.ok) {
@@ -122,14 +123,19 @@ async function generateAndUploadImage(prompt, wordForName) {
       var snap = await ref.put(blob, { contentType: 'image/png' });
       return await snap.ref.getDownloadURL();
     }
+    fetchErr = 'HTTP ' + res.status;
   } catch (e) {
-    // fetch 被 CORS 擋 → 改用 canvas 繞過
+    fetchErr = e.message;
   }
 
-  // 後備：用 canvas 把圖畫出來再轉 blob（繞過 CORS，同 db.js 的 uploadViaCanvas 手法）
-  var blob2 = await imageUrlToBlobViaCanvas(swarmUrl);
-  var snap2 = await ref.put(blob2, { contentType: 'image/png' });
-  return await snap2.ref.getDownloadURL();
+  // 後備：canvas 繞過 CORS
+  try {
+    var blob2 = await imageUrlToBlobViaCanvas(swarmUrl);
+    var snap2 = await ref.put(blob2, { contentType: 'image/png' });
+    return await snap2.ref.getDownloadURL();
+  } catch (e2) {
+    throw new Error('抓圖失敗。fetch:[' + fetchErr + '] canvas:[' + e2.message + ']\nURL: ' + swarmUrl);
+  }
 }
 
 // 用 <img> + canvas 把跨來源圖片轉成 blob（瀏覽器載 img 不受 CORS 阻擋）
