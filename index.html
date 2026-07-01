@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>英文單字學習樂園</title>
-  <link rel="stylesheet" href="style.css?v=55" />
+  <link rel="stylesheet" href="style.css?v=56" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#4A90D9" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -52,7 +52,7 @@
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v55</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v56</div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -478,31 +478,31 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="db.js?v=55"></script>
-  <script src="fsrs-engine.js?v=55"></script>
-  <script src="ai.js?v=55"></script>
-  <script src="imagegen.js?v=55"></script>
-  <script src="games/memory.js?v=55"></script>
-  <script src="games/listen.js?v=55"></script>
-  <script src="games/fillblank.js?v=55"></script>
-  <script src="games/spelling.js?v=55"></script>
-  <script src="games/speak.js?v=55"></script>
-  <script src="games/bubble.js?v=55"></script>
-  <script src="games/echo.js?v=55"></script>
-  <script src="games/flashlight.js?v=55"></script>
-  <script src="games/detective.js?v=55"></script>
-  <script src="games/match.js?v=55"></script>
-  <script src="games/cloze.js?v=55"></script>
-  <script src="games/learn.js?v=55"></script>
-  <script src="games/atlas.js?v=55"></script>
-  <script src="app.js?v=55"></script>
-  <script src="coins.js?v=55"></script>
-  <script src="dev.js?v=55"></script>
-  <script src="cloud.js?v=55"></script>
-  <script src="patches.js?v=55"></script>
-  <script src="monster.js?v=55"></script>
+  <script src="db.js?v=56"></script>
+  <script src="fsrs-engine.js?v=56"></script>
+  <script src="ai.js?v=56"></script>
+  <script src="imagegen.js?v=56"></script>
+  <script src="games/memory.js?v=56"></script>
+  <script src="games/listen.js?v=56"></script>
+  <script src="games/fillblank.js?v=56"></script>
+  <script src="games/spelling.js?v=56"></script>
+  <script src="games/speak.js?v=56"></script>
+  <script src="games/bubble.js?v=56"></script>
+  <script src="games/echo.js?v=56"></script>
+  <script src="games/flashlight.js?v=56"></script>
+  <script src="games/detective.js?v=56"></script>
+  <script src="games/match.js?v=56"></script>
+  <script src="games/cloze.js?v=56"></script>
+  <script src="games/learn.js?v=56"></script>
+  <script src="games/atlas.js?v=56"></script>
+  <script src="app.js?v=56"></script>
+  <script src="coins.js?v=56"></script>
+  <script src="dev.js?v=56"></script>
+  <script src="cloud.js?v=56"></script>
+  <script src="patches.js?v=56"></script>
+  <script src="monster.js?v=56"></script>
   <script>
-    var APP_VERSION = 'v55';
+    var APP_VERSION = 'v56';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號
@@ -528,27 +528,27 @@
 
     // 🔄 更新：強制清掉程式快取並重抓最新程式
     async function appUpdate() {
+      var btn = event && event.target ? event.target : null;
+      if (btn) { btn.disabled = true; btn.textContent = '更新中...'; }
       try {
         // 1. 刪掉所有「程式快取」（保留 media 圖片/音檔快取）
         if ('caches' in window) {
           var keys = await caches.keys();
           await Promise.all(keys.map(function(k) {
-            // 只刪程式快取（word-learner-vXX），保留 word-learner-media
             if (k.indexOf('media') === -1) return caches.delete(k);
             return Promise.resolve();
           }));
         }
-        // 2. 叫 service worker 更新 + 跳過等待
+        // 2. 註銷 service worker（最徹底：下次載入會重新註冊最新的 sw.js）
         if ('serviceWorker' in navigator) {
-          var reg = await navigator.serviceWorker.getRegistration();
-          if (reg) {
-            await reg.update();
-            if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
+          var regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(function(r) { return r.unregister(); }));
         }
       } catch (e) { /* 忽略，照常重整 */ }
-      // 3. 強制重整（加時間戳避免瀏覽器自身快取）
-      location.reload(true);
+      // 3. 用帶時間戳的網址硬重整，確保繞過瀏覽器 HTML 快取
+      var u = location.href.split('#')[0];
+      u += (u.indexOf('?') === -1 ? '?' : '&') + '_r=' + Date.now();
+      location.replace(u);
     }
 
     // 🗑️ 清除圖片/音檔快取

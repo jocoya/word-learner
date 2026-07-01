@@ -800,17 +800,25 @@ body {
 
 /* ===== 獎勵系統 ===== */
 .reward-summary {
-  display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+  display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;
+}
+.reward-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
 }
 .reward-item {
-  background: #fff; border-radius: 14px; padding: 12px 16px;
-  display: flex; align-items: center; gap: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.06); cursor: pointer;
-  transition: transform .2s;
+  background: #fff; border-radius: 14px; padding: 14px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.08); cursor: pointer;
+  transition: transform .15s;
 }
 .reward-item:hover { transform: scale(1.05); }
-.reward-item img { width: 40px; height: 40px; object-fit: contain; }
-.reward-item-count { font-size: 1.3em; font-weight: 700; color: #333; }
+.reward-item:active { transform: scale(0.96); }
+.reward-item img { width: 48px; height: 48px; object-fit: contain; }
+.reward-item-name { font-size: .85em; color: #666; font-weight: 600; }
+.reward-item-count { font-size: 1.25em; font-weight: 800; color: #333; }
+.reward-item-empty { opacity: .5; }
 
 /* 寶箱 modal */
 .chest-modal {
@@ -984,8 +992,10 @@ body {
   .coin-card-row span[style*="font-size:3em"] { font-size: 3.5em !important; }
   .coin-card-row img { width: 56px !important; height: 56px !important; }
   .coin-card-count { font-size: 3em; }
-  .reward-item { padding: 14px 20px; border-radius: 16px; }
-  .reward-item img { width: 48px; height: 48px; }
+  .reward-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+  .reward-item { padding: 18px 10px; border-radius: 16px; }
+  .reward-item img { width: 60px; height: 60px; }
+  .reward-item-name { font-size: .95em; }
   .reward-item-count { font-size: 1.5em; }
 
   /* 寶箱 */
@@ -2149,13 +2159,13 @@ body {
 .atlas-enter-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #2E7D32; }
 
 .atlas-body {
-  padding: 12px 16px 40px;
-  max-width: 1400px;
+  padding: 10px 12px 30px;
+  max-width: 100%;
   margin: 0 auto;
 }
 .atlas-topinfo {
   display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 12px; margin-bottom: 12px;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 10px;
 }
 .atlas-child-tabs { display: flex; gap: 8px; }
 .atlas-child-tab {
@@ -2172,12 +2182,14 @@ body {
   padding: 60px 20px; font-size: 1.1em;
 }
 
-/* 地圖畫布：底圖 + 節點疊層 */
+/* 地圖畫布：底圖填滿可視範圍（維持圖片比例），節點依 % 座標疊放 */
 .atlas-map {
   position: relative;
   width: 100%;
+  max-width: calc((100vh - 180px) * 1.3333);  /* 依高度換算寬度，維持 4:3 底圖比例 */
+  margin: 0 auto;
   aspect-ratio: 1448 / 1086;
-  border-radius: 20px;
+  border-radius: 18px;
   overflow: hidden;
   box-shadow: 0 8px 28px rgba(0,0,0,0.2);
 }
@@ -2187,48 +2199,74 @@ body {
   user-select: none; -webkit-user-drag: none;
 }
 
-/* 島節點 */
+/* 冒險路徑（虛線） */
+.atlas-path {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 1;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35));
+}
+
+/* 島節點：圓形島章 + 進度環 + 下方名牌 */
 .atlas-node {
   position: absolute;
   transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center;
-  gap: 4px;
-  width: 16%; min-width: 96px;
-  padding: 8px 6px;
-  border: none;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.92);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-  cursor: pointer;
+  z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: none; padding: 0; cursor: pointer;
   transition: transform .12s;
 }
-.atlas-node:active { transform: translate(-50%, -50%) scale(0.94); }
-.atlas-node-emoji { font-size: 2.4em; line-height: 1; }
+.atlas-node:active { transform: translate(-50%, -50%) scale(0.92); }
+
+/* 進度環：外圈用 conic-gradient 顯示完成度 */
+.atlas-node-ring {
+  position: relative;
+  width: 74px; height: 74px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: conic-gradient(#4CAF50 var(--pct, 0%), rgba(255,255,255,0.55) 0);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+}
+.atlas-node-disc {
+  width: 60px; height: 60px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #eaf4ff);
+  border: 2px solid #fff;
+}
+.atlas-node-emoji { font-size: 2em; line-height: 1; }
+
+/* 下方名牌（半透明底，字清楚） */
+.atlas-node-label {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: rgba(0,0,0,0.55); color: #fff;
+  padding: 3px 10px; border-radius: 999px;
+  backdrop-filter: blur(2px);
+}
 .atlas-node-name {
-  font-size: .95em; font-weight: 800; color: #444;
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .9em; font-weight: 800; color: #fff;
+  max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0,0,0,.5);
 }
-.atlas-node-bar {
-  width: 84%; height: 8px; border-radius: 999px; background: #E0E0E0; overflow: hidden;
-}
-.atlas-node-fill { display: block; height: 100%; background: #4CAF50; border-radius: 999px; }
-.atlas-node-count { font-size: .8em; color: #777; font-weight: 700; }
-.atlas-tier { font-size: .85em; line-height: 1; letter-spacing: -2px; }
+.atlas-node-count { font-size: .75em; color: #FFE082; font-weight: 700; }
+.atlas-tier { font-size: .8em; line-height: 1; letter-spacing: -2px; }
 
 /* 節點狀態 */
-.atlas-node.locked { filter: grayscale(1); opacity: .8; }
-.atlas-node.locked .atlas-node-emoji { opacity: .55; }
-.atlas-node.progress { outline: 3px solid #FFB74D; }
-.atlas-node.cleared { outline: 3px solid #FFD54F; background: #FFFDE7; }
-.atlas-node.perfect { outline: 3px solid #FFD700; background: #FFFDE7; box-shadow: 0 4px 18px rgba(255,193,7,.6); }
-.atlas-crown, .atlas-flag {
-  position: absolute; top: -16px; right: -6px; font-size: 1.6em;
-  filter: drop-shadow(0 2px 3px rgba(0,0,0,.3));
+.atlas-node.locked .atlas-node-ring { background: rgba(255,255,255,0.5); }
+.atlas-node.locked .atlas-node-disc { filter: grayscale(1); opacity: .7; }
+.atlas-node.progress .atlas-node-ring { box-shadow: 0 3px 12px rgba(255,152,0,.55); }
+.atlas-node.cleared .atlas-node-disc { background: radial-gradient(circle at 35% 30%, #FFFDE7, #FFF3C4); }
+.atlas-node.perfect .atlas-node-ring {
+  background: conic-gradient(#FFD700 var(--pct,100%), #FFD700 0);
+  box-shadow: 0 3px 16px rgba(255,193,7,.7);
+}
+
+/* 徽章（旗/皇冠）+ 新字紅點 */
+.atlas-badge {
+  position: absolute; top: -10px; right: -6px; font-size: 1.4em;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.4));
 }
 .atlas-newdot {
-  position: absolute; top: -12px; left: -8px;
-  background: #f44336; color: #fff; font-size: .8em; font-weight: 800;
-  padding: 2px 8px; border-radius: 999px; box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  position: absolute; top: -8px; left: -8px;
+  background: #f44336; color: #fff; font-size: .72em; font-weight: 800;
+  padding: 2px 7px; border-radius: 999px; box-shadow: 0 2px 6px rgba(0,0,0,.35);
 }
 
 /* 分頁列 */
@@ -2282,9 +2320,10 @@ body {
 
 /* 大平板（2800×1752 等）放大排版 */
 @media (min-width: 1200px) {
-  .atlas-body { max-width: 1600px; }
-  .atlas-node { min-width: 130px; }
-  .atlas-node-emoji { font-size: 3em; }
+  .atlas-node-ring { width: 92px; height: 92px; }
+  .atlas-node-disc { width: 74px; height: 74px; }
+  .atlas-node-emoji { font-size: 2.6em; }
+  .atlas-node-name { font-size: 1.05em; max-width: 150px; }
   .island-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
   .island-card-img, .island-card-noimg { height: 150px; }
 }

@@ -14,14 +14,15 @@ var ATLAS_TIERS = [
   { tier: 3, s: 40, name: '大師關' }
 ];
 
-// 每頁 6 個節點在底圖上的相對座標（%）— 沿路徑蜿蜒排列
+// 每頁 6 個島節點座標（%）— 依 map.png 實際路徑鋪點，沿陸地小徑由左下往右上前進
+// 已避開中央水道與底部海灣，全部落在綠地/沙徑上
 var ATLAS_NODES = [
-  { x: 18, y: 80 },
-  { x: 40, y: 66 },
-  { x: 22, y: 48 },
-  { x: 50, y: 38 },
-  { x: 74, y: 50 },
-  { x: 80, y: 24 }
+  { x: 21, y: 62 },   // 1 左下角陸地
+  { x: 18, y: 37 },   // 2 左側小徑
+  { x: 38, y: 43 },   // 3 中央偏左草地
+  { x: 44, y: 20 },   // 4 上方中央小徑
+  { x: 66, y: 15 },   // 5 右上山腳小徑
+  { x: 80, y: 46 }    // 6 右側陸地
 ];
 
 // 標籤 → 代表 emoji（找不到就用預設）
@@ -181,26 +182,45 @@ async function renderAtlas() {
     return;
   }
 
-  // 地圖畫布（底圖 + 節點）
+  // 地圖畫布（底圖 + 連線路徑 + 節點）
   html += '<div class="atlas-map">';
   html += '<img class="atlas-map-bg" src="./images/map.png" alt="">';
+
+  // 連接節點的虛線冒險路徑（SVG，畫在底圖上、節點下）
+  var svgPts = pageIslands.map(function(isl, idx) {
+    var n = ATLAS_NODES[idx] || { x: 50, y: 50 };
+    return n.x + ',' + n.y;
+  });
+  if (svgPts.length >= 2) {
+    html += '<svg class="atlas-path" viewBox="0 0 100 100" preserveAspectRatio="none">' +
+      '<polyline points="' + svgPts.join(' ') + '" fill="none" stroke="rgba(255,255,255,0.75)" ' +
+      'stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 2.2"/>' +
+    '</svg>';
+  }
+
   pageIslands.forEach(function(isl, idx) {
     var node = ATLAS_NODES[idx] || { x: 50, y: 50 };
     var pct = isl.total > 0 ? Math.round(isl.familiar / isl.total * 100) : 0;
     var stateCls = isl.cleared ? (isl.perfect ? 'perfect' : 'cleared') : (isl.familiar > 0 ? 'progress' : 'locked');
-    var crown = isl.perfect ? '<span class="atlas-crown">👑</span>' : (isl.cleared ? '<span class="atlas-flag">🏴</span>' : '');
+    var badge = isl.perfect ? '<span class="atlas-badge crown">👑</span>'
+              : (isl.cleared ? '<span class="atlas-badge flag">🏴</span>' : '');
     var newDot = isl.newCount > 0 ? '<span class="atlas-newdot">+' + isl.newCount + '</span>' : '';
-    // 島級星星：熟悉關⭐ 應用關⭐⭐ 大師關⭐⭐⭐
     var tierStars = isl.tier > 0 ? '<span class="atlas-tier">' + new Array(isl.tier + 1).join('⭐') + '</span>' : '';
+    // 進度環（conic-gradient 由 CSS 變數帶入百分比）
     html +=
       '<button class="atlas-node ' + stateCls + '" style="left:' + node.x + '%;top:' + node.y + '%;" ' +
         'onclick="openIsland(\'' + encodeURIComponent(isl.tag) + '\')">' +
-        crown + newDot +
-        '<span class="atlas-node-emoji">' + isl.emoji + '</span>' +
-        '<span class="atlas-node-name">' + esc(isl.tag) + '</span>' +
-        tierStars +
-        '<span class="atlas-node-bar"><span class="atlas-node-fill" style="width:' + pct + '%;"></span></span>' +
-        '<span class="atlas-node-count">' + isl.familiar + '/' + isl.total + '</span>' +
+        '<span class="atlas-node-ring" style="--pct:' + pct + '%;">' +
+          '<span class="atlas-node-disc">' +
+            '<span class="atlas-node-emoji">' + isl.emoji + '</span>' +
+          '</span>' +
+          badge + newDot +
+        '</span>' +
+        '<span class="atlas-node-label">' +
+          '<span class="atlas-node-name">' + esc(isl.tag) + '</span>' +
+          tierStars +
+          '<span class="atlas-node-count">' + isl.familiar + '/' + isl.total + '</span>' +
+        '</span>' +
       '</button>';
   });
   html += '</div>';

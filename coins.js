@@ -62,17 +62,19 @@ async function renderCoinPage() {
     var rewards = getChildRewards(coins, group.child);
     html += '<div class="reward-group">';
     html += '<div class="reward-group-title">' + group.label + '</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:10px;">';
+    html += '<div class="reward-grid">';
     // 金幣本身
     html += '<div class="reward-item" onclick="askRedeem(\'' + group.child + '\',\'' + esc(group.coinName) + '\',' + group.coinCount + ',\'' + group.child + '\')">' +
       '<img src="' + group.coinImg + '" alt="' + esc(group.coinName) + '">' +
+      '<span class="reward-item-name">' + esc(group.coinName) + '</span>' +
       '<span class="reward-item-count">x ' + group.coinCount + '</span>' +
     '</div>';
     // 禮券
     REWARDS.forEach(function(r) {
       var count = rewards[r.key] || 0;
-      html += '<div class="reward-item" onclick="askRedeem(\'' + r.key + '\',\'' + esc(r.name) + '\',' + count + ',\'' + group.child + '\')">' +
+      html += '<div class="reward-item' + (count === 0 ? ' reward-item-empty' : '') + '" onclick="askRedeem(\'' + r.key + '\',\'' + esc(r.name) + '\',' + count + ',\'' + group.child + '\')">' +
         '<img src="' + r.img + '" alt="' + esc(r.name) + '">' +
+        '<span class="reward-item-name">' + esc(r.name) + '</span>' +
         '<span class="reward-item-count">x ' + count + '</span>' +
       '</div>';
     });
