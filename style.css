@@ -2213,6 +2213,7 @@ body {
 }
 .atlas-node-fill { display: block; height: 100%; background: #4CAF50; border-radius: 999px; }
 .atlas-node-count { font-size: .8em; color: #777; font-weight: 700; }
+.atlas-tier { font-size: .85em; line-height: 1; letter-spacing: -2px; }
 
 /* 節點狀態 */
 .atlas-node.locked { filter: grayscale(1); opacity: .8; }

@@ -269,9 +269,8 @@ async function checkStreakDiamond(role) {
     else break;
     d.setDate(d.getDate() - 1);
   }
-  if (streak > 0 && streak % 5 === 0) {
-    // 用 lastStreakRewardDate 防止同一天重複給
-    if (coins.lastStreakRewardDate === getTodayStr()) return;
+  // 連續 3 天 → 送鑽石（每逢 3 的倍數給一次，用 lastStreakRewardDate 防重複）
+  if (streak > 0 && streak % 3 === 0 && coins.lastStreakRewardDate !== getTodayStr()) {
     var fieldName = role === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
     coins[fieldName] = coins[fieldName] || {};
     coins[fieldName]['diamond'] = (coins[fieldName]['diamond'] || 0) + 1;
@@ -282,7 +281,18 @@ async function checkStreakDiamond(role) {
     var div = document.createElement('div');
     div.className = 'streak-diamond-pop';
     div.innerHTML = '<img src="./images/diamond.png" style="width:64px;height:64px;"><div>🔥 連續 ' + streak + ' 天！鑽石 +1</div>';
-    document.querySelector('.result-screen').appendChild(div);
+    var rs = document.querySelector('.result-screen');
+    if (rs) rs.appendChild(div);
+  }
+
+  // 連續 5 天 → 送寶箱（每逢 5 的倍數給一次，用 lastStreakChestDate 防重複）
+  if (streak > 0 && streak % 5 === 0 && coins.lastStreakChestDate !== getTodayStr()) {
+    coins.lastStreakChestDate = getTodayStr();
+    await saveCoins(coins);
+    // 寶箱歸屬目前角色（每日挑戰時 currentChild 已設為 role）
+    if (typeof showChestModal === 'function') {
+      setTimeout(function() { showChestModal(); }, 800);
+    }
   }
 }
 

@@ -102,6 +102,7 @@ async function devResetToday() {
   delete coins['coinEarned-boy-' + today];
   delete coins['coinEarned-girl-' + today];
   if (coins.lastStreakRewardDate === today) coins.lastStreakRewardDate = '';
+  if (coins.lastStreakChestDate === today) coins.lastStreakChestDate = '';
   await saveCoins(coins);
   // 認識新朋友橫幅：清今天的次數，讓橫幅再出現
   await dbPut('settings', { key: 'bannerLearn', date: today, count: 0 });

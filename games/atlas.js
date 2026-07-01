@@ -7,6 +7,12 @@
 var ATLAS_PER_PAGE = 6;
 // 熟悉期門檻（與 fsrs-engine STAGE_THRESHOLDS[0].s 對齊）
 var ATLAS_FAMILIAR_S = 3;
+// 島的三個階級門檻：熟悉 / 應用 / 大師（島級 = 島內所有單字都達到該階）
+var ATLAS_TIERS = [
+  { tier: 1, s: 3,  name: '熟悉關' },
+  { tier: 2, s: 15, name: '應用關' },
+  { tier: 3, s: 40, name: '大師關' }
+];
 
 // 每頁 6 個節點在底圖上的相對座標（%）— 沿路徑蜿蜒排列
 var ATLAS_NODES = [
@@ -36,7 +42,8 @@ function atlasEmoji(tag) {
 var atlasChild = 'boy';
 var atlasPage = 0;
 
-// 已通關旗子（永久）：存在 settings key = 'atlasCleared'
+// 已通關旗子 + 已發寶箱的階級（永久）：存在 settings key = 'atlasCleared'
+// 結構：{ boy: { animal: { cleared, perfect, date, tiersAwarded:[1,2,3] } }, girl: {...} }
 async function getAtlasCleared() {
   var s = await dbGet('settings', 'atlasCleared');
   return s || { key: 'atlasCleared', boy: {}, girl: {} };
@@ -45,8 +52,25 @@ async function markIslandCleared(child, tag, perfect) {
   var s = await getAtlasCleared();
   if (!s[child]) s[child] = {};
   var prev = s[child][tag] || {};
-  s[child][tag] = { cleared: true, perfect: !!perfect || !!prev.perfect, date: prev.date || getTodayStr() };
+  s[child][tag] = {
+    cleared: true,
+    perfect: !!perfect || !!prev.perfect,
+    date: prev.date || getTodayStr(),
+    tiersAwarded: prev.tiersAwarded || []
+  };
   await dbPut('settings', s);
+}
+
+// 計算島級：島內「所有單字」都達到某門檻，才算島達到該階
+// 回傳 0=尚未全部熟悉 / 1=熟悉關 / 2=應用關 / 3=大師關
+function islandTierFromStabilities(stabs) {
+  if (!stabs.length) return 0;
+  var minS = Math.min.apply(null, stabs);
+  var tier = 0;
+  for (var i = 0; i < ATLAS_TIERS.length; i++) {
+    if (minS >= ATLAS_TIERS[i].s) tier = ATLAS_TIERS[i].tier;
+  }
+  return tier;
 }
 
 // 計算某小孩的所有島（含進度）
@@ -62,21 +86,27 @@ async function computeIslands(child) {
       var tag = tags[i];
       var words = await getWordsByTag(tag);
       if (!words.length) continue;
+      var stabs = [];
       var familiar = 0;
       for (var j = 0; j < words.length; j++) {
         var s = (typeof getWordStability === 'function') ? await getWordStability(words[j].id) : 0;
+        stabs.push(s);
         if (s >= ATLAS_FAMILIAR_S) familiar++;
       }
       var total = words.length;
-      var wasCleared = !!(childCleared[tag] && childCleared[tag].cleared);
+      var tier = islandTierFromStabilities(stabs);      // 0~3：島目前達到的階級
+      var rec = childCleared[tag] || {};
+      var wasCleared = !!rec.cleared;
       var nowAllFamiliar = familiar >= total;
       islands.push({
         tag: tag,
         emoji: atlasEmoji(tag),
         total: total,
         familiar: familiar,
-        cleared: wasCleared || nowAllFamiliar,     // 通關過就永久算通關
-        perfect: nowAllFamiliar,                    // 目前是否全部熟悉（含新字）
+        tier: tier,                                     // 島級（全部單字的最低階）
+        tiersAwarded: rec.tiersAwarded || [],           // 已發過寶箱的階級
+        cleared: wasCleared || nowAllFamiliar,          // 通關過就永久算通關
+        perfect: nowAllFamiliar,                        // 目前是否全部熟悉（含新字）
         newCount: wasCleared && !nowAllFamiliar ? (total - familiar) : 0 // 通關後又有新朋友
       });
     }
@@ -102,9 +132,31 @@ async function renderAtlas() {
 
   var islands = await computeIslands(atlasChild);
 
-  // 更新已通關旗子（若目前全熟悉但還沒記錄 → 記一枚旗子）
-  for (var i = 0; i < islands.length; i++) {
-    if (islands[i].perfect) await markIslandCleared(atlasChild, islands[i].tag, true);
+  // 檢查島級升級 → 每跨一階給寶箱（熟悉/應用/大師各給一次，永久記錄避免重複）
+  // 測試模式不發獎勵
+  var devSkip = (typeof devSkipRewards === 'function' && devSkipRewards());
+  var pendingChests = 0;
+  if (!devSkip) {
+    var clearedData = await getAtlasCleared();
+    if (!clearedData[atlasChild]) clearedData[atlasChild] = {};
+    var changed = false;
+    for (var i = 0; i < islands.length; i++) {
+      var isl = islands[i];
+      var rec = clearedData[atlasChild][isl.tag] || { tiersAwarded: [] };
+      rec.tiersAwarded = rec.tiersAwarded || [];
+      // 島目前達到 tier 級 → 補發 1..tier 中還沒發過的寶箱
+      for (var t = 1; t <= isl.tier; t++) {
+        if (rec.tiersAwarded.indexOf(t) === -1) {
+          rec.tiersAwarded.push(t);
+          pendingChests++;
+          changed = true;
+        }
+      }
+      if (isl.perfect) { rec.cleared = true; rec.perfect = true; rec.date = rec.date || getTodayStr(); }
+      else if (isl.cleared) { rec.cleared = true; }
+      clearedData[atlasChild][isl.tag] = rec;
+    }
+    if (changed) await dbPut('settings', clearedData);
   }
 
   var totalPages = Math.max(1, Math.ceil(islands.length / ATLAS_PER_PAGE));
@@ -138,12 +190,15 @@ async function renderAtlas() {
     var stateCls = isl.cleared ? (isl.perfect ? 'perfect' : 'cleared') : (isl.familiar > 0 ? 'progress' : 'locked');
     var crown = isl.perfect ? '<span class="atlas-crown">👑</span>' : (isl.cleared ? '<span class="atlas-flag">🏴</span>' : '');
     var newDot = isl.newCount > 0 ? '<span class="atlas-newdot">+' + isl.newCount + '</span>' : '';
+    // 島級星星：熟悉關⭐ 應用關⭐⭐ 大師關⭐⭐⭐
+    var tierStars = isl.tier > 0 ? '<span class="atlas-tier">' + new Array(isl.tier + 1).join('⭐') + '</span>' : '';
     html +=
       '<button class="atlas-node ' + stateCls + '" style="left:' + node.x + '%;top:' + node.y + '%;" ' +
         'onclick="openIsland(\'' + encodeURIComponent(isl.tag) + '\')">' +
         crown + newDot +
         '<span class="atlas-node-emoji">' + isl.emoji + '</span>' +
         '<span class="atlas-node-name">' + esc(isl.tag) + '</span>' +
+        tierStars +
         '<span class="atlas-node-bar"><span class="atlas-node-fill" style="width:' + pct + '%;"></span></span>' +
         '<span class="atlas-node-count">' + isl.familiar + '/' + isl.total + '</span>' +
       '</button>';
@@ -160,6 +215,34 @@ async function renderAtlas() {
   }
 
   if (body) body.innerHTML = html;
+
+  // 有島升級 → 依序彈出寶箱（每階一個）
+  if (pendingChests > 0) {
+    setTimeout(function() { showChestSequence(pendingChests); }, 500);
+  }
+}
+
+// 依序彈出 n 個寶箱（島升級獎勵用）：寶箱歸屬目前檢視的圖鑑小孩
+function showChestSequence(n) {
+  var prevChild = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+  if (typeof currentChild !== 'undefined') currentChild = atlasChild;
+  var remaining = n;
+  var origClose = closeChestModal;
+  function openNext() {
+    if (remaining <= 0) {
+      closeChestModal = origClose;        // 還原
+      if (typeof currentChild !== 'undefined') currentChild = prevChild;
+      return;
+    }
+    remaining--;
+    showChestModal();
+  }
+  // 暫時攔截關閉：關掉一個就開下一個
+  closeChestModal = function() {
+    hideModal('modal-chest');
+    setTimeout(openNext, 250);
+  };
+  openNext();
 }
 
 function switchAtlasChild(child) { atlasChild = child; atlasPage = 0; renderAtlas(); }
