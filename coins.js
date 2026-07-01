@@ -4,12 +4,24 @@
 var pendingRedeemKey = null;
 var pendingRedeemChild = null;
 var REWARDS = [
-  { key: '3C', name: '3C禮卷', img: './images/3C.png' },
-  { key: 'D', name: '甜點禮卷', img: './images/D.png' },
-  { key: 'B', name: '購物禮卷', img: './images/B.png' },
-  { key: 'TV', name: 'TV禮卷', img: './images/TV.png' },
-  { key: 'diamond', name: '鑽石', img: './images/diamond.png' },
+  { key: '3C', name: '3C禮卷', img: './images/3C.png', weight: 10 },
+  { key: 'D', name: '甜點禮卷', img: './images/D.png', weight: 20 },
+  { key: 'B', name: '購物禮卷', img: './images/B.png', weight: 5 },
+  { key: 'TV', name: 'TV禮卷', img: './images/TV.png', weight: 10 },
+  { key: 'diamond', name: '鑽石', img: './images/diamond.png', weight: 55 },
 ];
+
+// 依權重隨機抽一個寶箱獎勵（3C 10% / D 20% / B 5% / TV 10% / 鑽石 55%）
+function pickWeightedReward() {
+  var totalW = 0;
+  for (var i = 0; i < REWARDS.length; i++) totalW += (REWARDS[i].weight || 0);
+  var r = Math.random() * totalW;
+  for (var j = 0; j < REWARDS.length; j++) {
+    r -= (REWARDS[j].weight || 0);
+    if (r < 0) return REWARDS[j];
+  }
+  return REWARDS[REWARDS.length - 1];
+}
 
 // 取得某小孩的禮券集合（向後相容：舊資料的 coins.rewards 視為共用，首次顯示時不動）
 function getChildRewards(coins, child) {
@@ -22,7 +34,7 @@ async function renderCoinPage() {
   var daily = await getDailyData();
   var coins = await getCoins();
 
-  // 金幣卡（兩個小孩並排）
+  // 金幣卡（兩個小孩並排）+ 圖鑑（學習地圖）入口
   document.getElementById('coinSummary').innerHTML =
     '<div class="coin-card">' +
       '<div class="coin-card-row">' +
@@ -30,6 +42,7 @@ async function renderCoinPage() {
         '<img src="./images/COIN_CAT.png" style="width:56px;height:56px;object-fit:contain;">' +
         '<span class="coin-card-count">' + coins.boy + '</span>' +
       '</div>' +
+      '<button class="atlas-enter-btn" onclick="openAtlas(\'boy\')">🗺️ 小男生圖鑑</button>' +
     '</div>' +
     '<div class="coin-card">' +
       '<div class="coin-card-row">' +
@@ -37,6 +50,7 @@ async function renderCoinPage() {
         '<img src="./images/COIN_DOG.png" style="width:56px;height:56px;object-fit:contain;">' +
         '<span class="coin-card-count">' + coins.girl + '</span>' +
       '</div>' +
+      '<button class="atlas-enter-btn" onclick="openAtlas(\'girl\')">🗺️ 小女生圖鑑</button>' +
     '</div>';
 
   // 獎勵統計（小男生 / 小女生 各一區）
@@ -137,7 +151,7 @@ async function openChest() {
   img.src = './images/OPEN%20BOX.png';
   img.classList.add('chest-open-anim');
   img.style.pointerEvents = 'none';
-  var reward = REWARDS[Math.floor(Math.random() * REWARDS.length)];
+  var reward = pickWeightedReward();
   setTimeout(async function() {
     document.getElementById('chestStage').hidden = true;
     document.getElementById('chestReward').hidden = false;

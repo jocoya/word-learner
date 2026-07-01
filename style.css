@@ -2129,3 +2129,161 @@ body {
   border: 3px solid #FFB74D;
 }
 .profile-card.learn .profile-name { color: #E65100; }
+
+
+/* ===== 學習地圖（Atlas）===== */
+.atlas-enter-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #43A047, #66BB6A);
+  color: #fff;
+  font-size: 1.1em;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #2E7D32;
+  transition: transform .1s, box-shadow .1s;
+}
+.atlas-enter-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #2E7D32; }
+
+.atlas-body {
+  padding: 12px 16px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.atlas-topinfo {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 12px;
+}
+.atlas-child-tabs { display: flex; gap: 8px; }
+.atlas-child-tab {
+  padding: 8px 18px; border: 2px solid #FFC107; border-radius: 999px;
+  background: #fff; color: #666; font-weight: 700; font-size: 1em; cursor: pointer;
+}
+.atlas-child-tab.active { background: #FFC107; color: #fff; }
+.atlas-progress {
+  font-size: 1.15em; font-weight: 800; color: #5D4037;
+  background: #FFF8E1; padding: 8px 16px; border-radius: 999px;
+}
+.atlas-empty {
+  text-align: center; color: #888; line-height: 1.8;
+  padding: 60px 20px; font-size: 1.1em;
+}
+
+/* 地圖畫布：底圖 + 節點疊層 */
+.atlas-map {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1448 / 1086;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.2);
+}
+.atlas-map-bg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  user-select: none; -webkit-user-drag: none;
+}
+
+/* 島節點 */
+.atlas-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px;
+  width: 16%; min-width: 96px;
+  padding: 8px 6px;
+  border: none;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.92);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  cursor: pointer;
+  transition: transform .12s;
+}
+.atlas-node:active { transform: translate(-50%, -50%) scale(0.94); }
+.atlas-node-emoji { font-size: 2.4em; line-height: 1; }
+.atlas-node-name {
+  font-size: .95em; font-weight: 800; color: #444;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.atlas-node-bar {
+  width: 84%; height: 8px; border-radius: 999px; background: #E0E0E0; overflow: hidden;
+}
+.atlas-node-fill { display: block; height: 100%; background: #4CAF50; border-radius: 999px; }
+.atlas-node-count { font-size: .8em; color: #777; font-weight: 700; }
+
+/* 節點狀態 */
+.atlas-node.locked { filter: grayscale(1); opacity: .8; }
+.atlas-node.locked .atlas-node-emoji { opacity: .55; }
+.atlas-node.progress { outline: 3px solid #FFB74D; }
+.atlas-node.cleared { outline: 3px solid #FFD54F; background: #FFFDE7; }
+.atlas-node.perfect { outline: 3px solid #FFD700; background: #FFFDE7; box-shadow: 0 4px 18px rgba(255,193,7,.6); }
+.atlas-crown, .atlas-flag {
+  position: absolute; top: -16px; right: -6px; font-size: 1.6em;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.3));
+}
+.atlas-newdot {
+  position: absolute; top: -12px; left: -8px;
+  background: #f44336; color: #fff; font-size: .8em; font-weight: 800;
+  padding: 2px 8px; border-radius: 999px; box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+
+/* 分頁列 */
+.atlas-pager {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  margin-top: 16px;
+}
+.atlas-pg-btn {
+  padding: 10px 20px; border: none; border-radius: 14px;
+  background: #42A5F5; color: #fff; font-weight: 800; font-size: 1em; cursor: pointer;
+  box-shadow: 0 3px 0 #1E88E5;
+}
+.atlas-pg-btn:disabled { background: #ccc; box-shadow: 0 3px 0 #aaa; cursor: default; }
+.atlas-pg-info { font-weight: 700; color: #555; }
+
+/* 島嶼詳情：單字卡牆 */
+.island-detail-head { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.island-detail-head h3 { margin: 0; font-size: 1.5em; }
+.island-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+.island-card {
+  border-radius: 16px; background: #fff; padding: 12px;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+  text-align: center; cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform .12s;
+}
+.island-card:active { transform: scale(0.96); }
+.island-card.new { filter: grayscale(0.75); opacity: .85; }
+.island-card.familiar { border-color: #81C784; }
+.island-card.apply { border-color: #FFB74D; }
+.island-card.master { border-color: #F06292; box-shadow: 0 4px 16px rgba(240,98,146,.35); }
+.island-card-img { width: 100%; height: 120px; object-fit: contain; border-radius: 10px; }
+.island-card-noimg {
+  width: 100%; height: 120px; display: flex; align-items: center; justify-content: center;
+  background: #F5F5F5; border-radius: 10px; color: #999; font-size: 1.1em;
+}
+.island-card-word { font-size: 1.25em; font-weight: 800; color: #333; margin-top: 8px; }
+.island-card-meaning { font-size: .95em; color: #777; }
+.island-card-stage {
+  display: inline-block; margin-top: 6px; padding: 2px 12px; border-radius: 999px;
+  font-size: .8em; font-weight: 800; color: #fff;
+}
+.island-card-stage.new { background: #9E9E9E; }
+.island-card-stage.familiar { background: #4CAF50; }
+.island-card-stage.apply { background: #FF9800; }
+.island-card-stage.master { background: #E91E63; }
+
+/* 大平板（2800×1752 等）放大排版 */
+@media (min-width: 1200px) {
+  .atlas-body { max-width: 1600px; }
+  .atlas-node { min-width: 130px; }
+  .atlas-node-emoji { font-size: 3em; }
+  .island-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .island-card-img, .island-card-noimg { height: 150px; }
+}

@@ -465,24 +465,8 @@ async function finishWordRound(payload) {
   if (!payload || !payload.wordId) return;
   var result = await recordGameResult(payload);
 
-  // 連續 3 題 Easy 且該單字今天第一次複習 → 給鑽石（歸目前小孩）
-  if (result.isEasy && result.isFirstToday) {
-    sessionEasyStreak++;
-    if (sessionEasyStreak >= 3) {
-      sessionEasyStreak = 0;
-      sessionDiamondsEarned++;
-      var coins = await getCoins();
-      var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
-      var fieldName = child === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
-      coins[fieldName] = coins[fieldName] || {};
-      coins[fieldName]['diamond'] = (coins[fieldName]['diamond'] || 0) + 1;
-      coins.log.push({ role: child, count: 0, date: getTodayStr(), chest: '💎 連續 Easy 鑽石' });
-      await saveCoins(coins);
-      showFloatingReward('💎 +1', '#00bcd4');
-    }
-  } else if (!result.isEasy) {
-    sessionEasyStreak = 0;
-  }
+  // 註：已移除「連續 3 題 Easy 直接送鑽石」機制（觸發太頻繁）。
+  //     鑽石改由「階段升級寶箱」與「連續 5 天挑戰」取得。
 
   // 階段升級獎勵
   if (result.stageUnlocked) {
