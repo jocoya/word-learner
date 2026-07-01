@@ -32,18 +32,19 @@ async function getGameWords(gameType) {
     words = words.filter(function(w) { return w.tags && w.tags.indexOf(tagFilter) !== -1; });
   }
 
-  // 套用遊戲難度門檻（依 stability 篩選）
-  // 小寶貝模式（baby）不套用門檻，讓 4 歲小孩無壓力玩
-  var skipThreshold = (typeof currentMode !== 'undefined' && currentMode === 'baby');
-  if (gameType && !skipThreshold && typeof filterWordsForGame === 'function') {
-    var filtered = await filterWordsForGame(words, gameType);
-    if (filtered.length < 4) {
-      var hint = (typeof getEasierGamesHint === 'function') ? getEasierGamesHint(gameType) : '';
-      alert('「' + (GAME_NAMES_ZH[gameType] || gameType) + '」目前還沒有夠熟的單字（至少需要 4 個）。\n\n' + hint);
+  // 需要例句的遊戲（句子排列 / 讀句選字）：檢查有例句的單字是否足夠，不夠才提醒
+  var NEEDS_SENTENCE = { fillblank: true, cloze: true };
+  if (gameType && NEEDS_SENTENCE[gameType]) {
+    var withSen = words.filter(function(w) {
+      return w.sentences && w.sentences.some(function(s) { return s && s.trim().split(/\s+/).length >= 2; });
+    });
+    if (withSen.length < 4) {
+      alert('「' + (GAME_NAMES_ZH[gameType] || gameType) + '」需要至少 4 個「有例句」的單字才能玩。\n\n請先到「管理單字」幫這些單字補上例句。');
       return null;
     }
-    words = filtered;
   }
+
+  // 註：已移除「不夠熟不給玩」的難度門檻 —— 不熟的字只是比較難過關，仍可練習。
 
   if (words.length < 4) { alert('單字不夠，至少需要 4 個！'); return null; }
 
@@ -526,11 +527,20 @@ function showLevelUpAnimation(stage) {
   setTimeout(function() { div.remove(); }, 2700);
 }
 
+// 是否正在玩「考試複習包」（考試包不計入 FSRS，畢業到永久庫才算）
+function isExamPackSource() {
+  var el = document.getElementById('gameSource');
+  var src = el ? el.value : '';
+  return src === 'exam-multi' || (typeof src === 'string' && src.indexOf('exam-') === 0);
+}
+
 // 包裝 updateProgress：保留多巴胺，把 FSRS 邏輯接進來
 var _originalUpdateProgress = updateProgress;
 updateProgress = async function(wordId, correct, gameType, extra) {
   // 測試模式：不寫進度、不給獎勵
   if (typeof devSkipRewards === 'function' && devSkipRewards()) return;
+  // 考試複習包：不計入 FSRS（單字畢業到永久庫後才會累積熟練度）
+  if (isExamPackSource()) return;
   // 如果有 gameType，走完整的 FSRS 流程
   if (gameType) {
     var payload = {
