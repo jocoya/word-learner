@@ -2159,9 +2159,11 @@ body {
 .atlas-enter-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #2E7D32; }
 
 .atlas-body {
-  padding: 10px 12px 30px;
+  padding: 10px 16px 30px;
+  width: 100%;
   max-width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 .atlas-topinfo {
   display: flex; align-items: center; justify-content: space-between;
@@ -2169,24 +2171,24 @@ body {
 }
 .atlas-child-tabs { display: flex; gap: 8px; }
 .atlas-child-tab {
-  padding: 8px 18px; border: 2px solid #FFC107; border-radius: 999px;
-  background: #fff; color: #666; font-weight: 700; font-size: 1em; cursor: pointer;
+  padding: 10px 22px; border: 2px solid #FFC107; border-radius: 999px;
+  background: #fff; color: #666; font-weight: 700; font-size: 1.05em; cursor: pointer;
 }
 .atlas-child-tab.active { background: #FFC107; color: #fff; }
 .atlas-progress {
-  font-size: 1.15em; font-weight: 800; color: #5D4037;
-  background: #FFF8E1; padding: 8px 16px; border-radius: 999px;
+  font-size: 1.2em; font-weight: 800; color: #5D4037;
+  background: #FFF8E1; padding: 8px 18px; border-radius: 999px;
 }
 .atlas-empty {
   text-align: center; color: #888; line-height: 1.8;
   padding: 60px 20px; font-size: 1.1em;
 }
 
-/* 地圖畫布：底圖填滿可視範圍（維持圖片比例），節點依 % 座標疊放 */
+/* 地圖畫布：盡量放大（填滿寬度，或以高度換算 4:3，取較大者），節點依 % 座標疊放 */
 .atlas-map {
   position: relative;
   width: 100%;
-  max-width: calc((100vh - 180px) * 1.3333);  /* 依高度換算寬度，維持 4:3 底圖比例 */
+  max-width: 1400px;
   margin: 0 auto;
   aspect-ratio: 1448 / 1086;
   border-radius: 18px;
@@ -2283,12 +2285,14 @@ body {
 .atlas-pg-info { font-weight: 700; color: #555; }
 
 /* 島嶼詳情：單字卡牆 */
+.island-detail { width: 100%; }
 .island-detail-head { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
 .island-detail-head h3 { margin: 0; font-size: 1.5em; }
 .island-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
+  width: 100%;
 }
 .island-card {
   border-radius: 16px; background: #fff; padding: 12px;
@@ -2319,11 +2323,12 @@ body {
 .island-card-stage.master { background: #E91E63; }
 
 /* 大平板（2800×1752 等）放大排版 */
-@media (min-width: 1200px) {
+@media (min-width: 1000px) {
   .atlas-node-ring { width: 92px; height: 92px; }
   .atlas-node-disc { width: 74px; height: 74px; }
   .atlas-node-emoji { font-size: 2.6em; }
-  .atlas-node-name { font-size: 1.05em; max-width: 150px; }
-  .island-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-  .island-card-img, .island-card-noimg { height: 150px; }
+  .atlas-node-name { font-size: 1.05em; max-width: 160px; }
+  .island-cards { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+  .island-card-img, .island-card-noimg { height: 160px; }
+  .island-card-word { font-size: 1.4em; }
 }
