@@ -278,6 +278,16 @@ body {
 }
 .spell-letter:hover { transform: scale(1.1); }
 .spell-letter.used { opacity: .3; pointer-events: none; }
+.spell-letter { touch-action: none; user-select: none; -webkit-user-select: none; }
+/* 拖曳中的字母幽靈 */
+.spell-ghost {
+  position: fixed; z-index: 10050; pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.15);
+  box-shadow: 0 6px 16px rgba(0,0,0,.35);
+  opacity: .95;
+}
+.spell-slot.filled { transition: background .15s; }
+.spell-hint-tip { font-size: .95em; color: #888; margin-bottom: 10px; }
 .spell-result { margin-top: 16px; font-size: 1.2em; font-weight: 600; }
 .spell-result.correct { color: #4CAF50; }
 .spell-result.wrong { color: #f44336; }
@@ -416,15 +426,16 @@ body {
 
 /* Image search results */
 .image-search-results {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 8px; padding: 8px 0; max-height: 240px; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px; padding: 10px 0; max-height: 60vh; overflow-y: auto;
+  width: 100%;
 }
 .image-search-results[hidden] { display: none; }
 .image-search-item {
   border-radius: 10px; overflow: hidden; cursor: pointer;
   border: 3px solid transparent; transition: border-color .2s;
   position: relative; background: #f8f8f8; padding: 4px;
-  min-height: 80px;
+  aspect-ratio: 1 / 1; min-height: 120px;
 }
 .image-search-item:hover { border-color: #667eea; }
 .image-search-item.selected { border-color: #4CAF50; }

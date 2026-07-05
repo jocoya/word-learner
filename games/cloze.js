@@ -71,10 +71,15 @@ function initClozeGame(area, words) {
           if (right) right.classList.add('correct');
         }
         if (isCorrect) correct++;
-        // 填回完整句子並朗讀
+        // 填回完整句子並朗讀（先 escape 純文字，再插入高亮 span，避免標籤被當文字顯示）
         var sentEl = area.querySelector('.cloze-sentence');
-        if (sentEl) sentEl.innerHTML = esc(sentence.replace(new RegExp('\\b' + target.word + '\\b', 'gi'),
-          '<span class="cloze-filled">' + esc(target.word) + '</span>'));
+        if (sentEl) {
+          var filledHtml = esc(sentence).replace(
+            new RegExp('\\b' + target.word + '\\b', 'gi'),
+            '<span class="cloze-filled">' + esc(target.word) + '</span>'
+          );
+          sentEl.innerHTML = filledHtml;
+        }
         speakWord(target.word);
         updateProgress(target.id, isCorrect, 'cloze', { mistakes: isCorrect ? 0 : 1 });
         document.getElementById('gameScore').textContent = correct + ' / ' + (current + 1);

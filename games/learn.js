@@ -17,16 +17,17 @@ async function startLearnSession(config) {
     return;
   }
 
-  // 只挑「認識期」的字，reps=0 全新優先、其次 S 低的
-  var enriched = [];
+  // 認識新朋友：presented 一次一批。count>0 取前 count 個；count<=0 代表不限量（全部）
+  // getNewFriends 已排除「已認識過」的字，且有例句的排前面，這裡去重避免重複題目
+  var seen = {};
+  var queue = [];
   for (var i = 0; i < newFriends.length; i++) {
     var w = newFriends[i];
-    var p = (typeof getProgressFor === 'function') ? await getProgressFor(w.id) : null;
-    var up = p ? ((typeof fsrsUpgrade === 'function') ? fsrsUpgrade(p) : p) : null;
-    enriched.push({ w: w, s: up ? (up.stability || 0) : 0, reps: up ? (up.reps || 0) : 0 });
+    if (seen[w.id]) continue;
+    seen[w.id] = true;
+    queue.push(w);
+    if (count > 0 && queue.length >= count) break;
   }
-  enriched.sort(function(a, b) { return (a.reps - b.reps) || (a.s - b.s); });
-  var queue = enriched.slice(0, count).map(function(x) { return x.w; });
   // 干擾選項用的字池（盡量用永久庫全部）
   var allWords = await dbGetByIndex('words', 'pool', 'permanent');
 
@@ -192,6 +193,11 @@ async function startLearnSession(config) {
     if (learnedFriends.length === 0) { goTo('page-home'); return; }
     var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
     var devSkip = (typeof devSkipRewards === 'function' && devSkipRewards());
+
+    // 標記這批新朋友「已認識」，之後不再列為新朋友（避免重複跳出）
+    if (!devSkip && typeof markFriendsMet === 'function') {
+      await markFriendsMet(child, learnedFriends.map(function(w) { return w.id; }));
+    }
 
     if (!devSkip && typeof getCoins === 'function') {
       var coins = await getCoins();

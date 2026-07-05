@@ -88,7 +88,10 @@ async function devResetProgress() {
   for (var i = 0; i < all.length; i++) {
     await dbDelete('progress', all[i].wordId);
   }
-  devOut('✅ 已重置 ' + all.length + ' 筆學習進度。所有單字回到認識期。');
+  // 一併清掉「已認識的新朋友」名單 + 地圖島通關紀錄，讓認識新朋友/地圖也重來
+  await dbPut('settings', { key: 'metFriends', boy: {}, girl: {} });
+  await dbPut('settings', { key: 'atlasCleared', boy: {}, girl: {} });
+  devOut('✅ 已重置 ' + all.length + ' 筆學習進度（含新朋友名單、地圖通關）。所有單字回到認識期。');
 }
 
 // 🔄 重置今日觸發：清掉今天的小怪物 + 每日挑戰標記，讓它們能立刻再觸發

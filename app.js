@@ -93,14 +93,30 @@ function renderGameCards() {
 }
 
 // 計算目前小孩「還沒學過（reps=0）」的字數，顯示誘因橫幅
-// 計算「認識期」的新朋友（reps=0 或 S<3）
-// 註：例句非必要（學習流程的「例句」步驟會在沒例句時自動略過），
-//     但有例句的字優先排前面，學習體驗較完整
+// 「已認識過的新朋友」名單（永久，per-child）：認識新朋友一旦學過就不再列為新朋友
+// 存 settings key = 'metFriends'，結構 { boy:{wordId:true}, girl:{...} }
+async function getMetFriends() {
+  var s = await dbGet('settings', 'metFriends');
+  return s || { key: 'metFriends', boy: {}, girl: {} };
+}
+async function markFriendsMet(child, wordIds) {
+  var s = await getMetFriends();
+  if (!s[child]) s[child] = {};
+  wordIds.forEach(function(id) { s[child][id] = true; });
+  await dbPut('settings', s);
+}
+
+// 計算「認識期」的新朋友：從沒被「認識新朋友」學過的字（reps=0 或 S<3）
+// 註：例句非必要（學習流程的「例句」步驟會在沒例句時自動略過），有例句的字優先排前面
 async function getNewFriends() {
   var words = await dbGetByIndex('words', 'pool', 'permanent');
+  var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+  var met = await getMetFriends();
+  var childMet = met[child] || {};
   var withSen = [], without = [];
   for (var i = 0; i < words.length; i++) {
     var w = words[i];
+    if (childMet[w.id]) continue; // 已認識過 → 不再當新朋友
     var p = (typeof getProgressFor === 'function') ? await getProgressFor(w.id) : null;
     var up = p ? ((typeof fsrsUpgrade === 'function') ? fsrsUpgrade(p) : p) : null;
     var s = up ? (up.stability || 0) : 0;
@@ -144,20 +160,20 @@ async function updateNewWordBanner() {
   banner.hidden = false;
 }
 
-// 橫幅版：認識 2 個新朋友 → 給 1 金幣，每天 2 次（獨立模組，不再經過線索偵探）
+// 橫幅版：認識新朋友 → 給 1 金幣，每天 2 次（不限量、題目不重複、學過不再出現）
 async function startBannerLearn() {
   var newFriends = await getNewFriends();
   if (!newFriends.length) { alert('目前沒有新朋友囉！'); return; }
   await incBannerLearnCount();
-  await startLearnSession({ count: 2, reward: 'coin', milestone: 0 });
+  await startLearnSession({ count: 0, reward: 'coin', milestone: 0 });
 }
 
-// 首頁大按鈕版：認識 5 個新朋友（家長跟讀）→ 全部完成才跳滿版圖，點圖後給 1 鑽石
+// 首頁大按鈕版：認識新朋友（家長跟讀）→ 全部完成才跳滿版圖，點圖後給 1 鑽石
 async function startHomeLearn() {
   var newFriends = await getNewFriends();
   if (!newFriends.length) { alert('目前沒有新朋友囉！所有單字都認識過了 🎉'); return; }
   currentMode = 'kid';
-  await startLearnSession({ count: 5, reward: 'diamond', milestone: 0 });
+  await startLearnSession({ count: 0, reward: 'diamond', milestone: 0 });
 }
 
 async function getGameWords() {
@@ -1326,8 +1342,145 @@ function renderMixEcho(area, target, words, cb) {
   setTimeout(function() { if(!done){done=true;cb(false);} }, 15000);
 }
 
+// ===== 拼字拖放：手指/滑鼠把字母拖到任一個缺塊（觸控友善，Pointer Events）=====
+// slots: NodeList of .spell-slot[data-blank="true"]（依單字順序）
+// bank:  NodeList of .spell-letter
+// onAllFilled(placedLetters): 全部缺塊填滿時呼叫，placedLetters = 依 slot 順序的字母陣列
+function attachSpellDrag(area, slots, bank, onAllFilled) {
+  var slotLetter = new Array(slots.length).fill(null); // 每個 slot 目前放的字母 token
+  var locked = false;
+
+  function countFilled() { return slotLetter.filter(function(x){ return x; }).length; }
+
+  function placeToken(token, slotIdx) {
+    // 若該 slot 已有字母，先退回原字母
+    if (slotLetter[slotIdx]) removeFromSlot(slotIdx);
+    slotLetter[slotIdx] = token;
+    token.classList.add('used');
+    var s = slots[slotIdx];
+    s.textContent = token.dataset.letter;
+    s.classList.add('filled');
+    if (countFilled() === slots.length) {
+      locked = true;
+      onAllFilled(slotLetter.map(function(t){ return t ? t.dataset.letter : ''; }));
+    }
+  }
+  function removeFromSlot(slotIdx) {
+    var token = slotLetter[slotIdx];
+    if (!token) return;
+    token.classList.remove('used');
+    slotLetter[slotIdx] = null;
+    slots[slotIdx].textContent = '';
+    slots[slotIdx].classList.remove('filled');
+  }
+
+  // 點已填的缺塊 → 退回字母
+  slots.forEach(function(slot, i) {
+    slot.addEventListener('click', function() {
+      if (locked) return;
+      removeFromSlot(i);
+    });
+  });
+
+  // 每個字母 token：pointer 拖曳
+  bank.forEach(function(token) {
+    token.addEventListener('pointerdown', function(e) {
+      if (locked || token.classList.contains('used')) return;
+      e.preventDefault();
+      var ghost = token.cloneNode(true);
+      ghost.className = 'spell-letter spell-ghost';
+      document.body.appendChild(ghost);
+      var moved = false;
+      function moveGhost(x, y) {
+        ghost.style.left = x + 'px';
+        ghost.style.top = y + 'px';
+      }
+      moveGhost(e.clientX, e.clientY);
+      function onMove(ev) { moved = true; moveGhost(ev.clientX, ev.clientY); }
+      function onUp(ev) {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        ghost.style.display = 'none';
+        var el = document.elementFromPoint(ev.clientX, ev.clientY);
+        ghost.remove();
+        if (locked) return;
+        var slot = el && el.closest ? el.closest('.spell-slot[data-blank="true"]') : null;
+        if (slot) {
+          var idx = Array.prototype.indexOf.call(slots, slot);
+          if (idx !== -1) { placeToken(token, idx); return; }
+        }
+        // 沒放到缺塊：若只是輕點（沒移動）→ 自動放進第一個空缺塊
+        if (!moved) {
+          for (var i = 0; i < slots.length; i++) { if (!slotLetter[i]) { placeToken(token, i); break; } }
+        }
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  });
+}
+
 // 單題拼字（不呼叫 updateProgress / showResult，由每日挑戰的 onAnswer 處理）
 function renderMixSpelling(area, target, cb) {
+  var letters = target.word.toLowerCase().split('');
+  var img = getRandomImage(target);
+  var blankCount = Math.max(2, Math.ceil(letters.length * 0.5));
+  var allIndices = letters.map(function(_, i) { return i; });
+  var blankIndices = shuffleArray(allIndices).slice(0, Math.min(blankCount, letters.length));
+  blankIndices.sort(function(a, b) { return a - b; });
+  var blankLetters = blankIndices.map(function(i) { return letters[i]; });
+  var shuffledBlanks = shuffleArray(blankLetters.slice());
+
+  area.innerHTML =
+    '<div class="spell-container">' +
+      (img ? '<img class="spell-image" src="' + img + '" alt="" onerror="this.style.display=\'none\'" />' : '') +
+      '<div class="spell-meaning">' + esc(target.meaning) + '</div>' +
+      '<button class="listen-play-btn" onclick="speakWord(\'' + esc(target.word) + '\')" title="聽發音" style="font-size:2em;margin-bottom:12px;">🔊</button>' +
+      '<div class="spell-hint-tip">把下面的字母拖到空格 ✋</div>' +
+      '<div class="spell-slots" id="spellSlots">' +
+        letters.map(function(l, i) {
+          return blankIndices.indexOf(i) !== -1
+            ? '<div class="spell-slot" data-blank="true" data-pos="' + i + '"></div>'
+            : '<div class="spell-slot filled hint" data-blank="false">' + l + '</div>';
+        }).join('') +
+      '</div>' +
+      '<div class="spell-letters" id="spellLetters">' +
+        shuffledBlanks.map(function(l, i) { return '<button class="spell-letter" data-idx="' + i + '" data-letter="' + l + '">' + l + '</button>'; }).join('') +
+      '</div>' +
+      '<div class="spell-result" id="spellResult"></div>' +
+    '</div>';
+
+  var blankSlots = area.querySelectorAll('.spell-slot[data-blank="true"]');
+  var letterBtns = area.querySelectorAll('.spell-letter');
+
+  attachSpellDrag(area, blankSlots, letterBtns, function(placed) {
+    var fullAnswer = letters.slice();
+    blankIndices.forEach(function(pos, fi) { fullAnswer[pos] = placed[fi]; });
+    var isCorrect = fullAnswer.join('') === target.word.toLowerCase();
+    var resultEl = document.getElementById('spellResult');
+    if (isCorrect) {
+      resultEl.textContent = '✅ 正確！';
+      resultEl.className = 'spell-result correct';
+    } else {
+      resultEl.textContent = '❌ 正確答案是 ' + target.word.toLowerCase();
+      resultEl.className = 'spell-result wrong';
+      blankSlots.forEach(function(s, si) {
+        s.textContent = blankLetters[si];
+        s.style.color = (placed[si] === blankLetters[si]) ? '#4CAF50' : '#f44336';
+      });
+    }
+    speakWord(target.word);
+    var wrongCount = 0;
+    for (var li = 0; li < placed.length; li++) {
+      if (placed[li] !== blankLetters[li]) wrongCount++;
+    }
+    letterBtns.forEach(function(b) { b.style.pointerEvents = 'none'; });
+    cb(isCorrect, { mistakes: wrongCount });
+  });
+}
+
+// （舊版點擊式拼字，保留不用）
+function renderMixSpelling_oldClick(area, target, cb) {
   var letters = target.word.toLowerCase().split('');
   var img = getRandomImage(target);
   var blankCount = Math.max(2, Math.ceil(letters.length * 0.5));
