@@ -220,9 +220,11 @@ async function startExamPractice() {
   const words = await dbGetByIndex('words', 'pool', 'exam-' + currentExamId);
   if (words.length < 4) { alert('考試包單字不夠，至少需要 4 個！'); return; }
   currentGameWords = shuffleArray(words);
-  currentMode = 'kid';
+  currentMode = 'kid';   // 考試複習一律用挑戰模式的遊戲清單
+  dailyRole = null;
   renderGameCards();
   goTo('page-games');
+  document.getElementById('gamesTitle').textContent = '📝 考試複習 — 選一個遊戲（挑戰模式）';
   const srcEl = document.getElementById('gameSource');
   const opt = document.createElement('option');
   opt.value = 'exam-' + currentExamId; opt.textContent = '目前考試包'; opt.selected = true;
@@ -909,7 +911,8 @@ async function startMultiExamPractice() {
   allWords = allWords.filter(function(w) { if (seen[w.id]) return false; seen[w.id] = true; return true; });
   if (allWords.length < 4) { alert('勾選的考試包單字總數不夠，至少需要 4 個！'); return; }
   currentGameWords = shuffleArray(allWords);
-  currentMode = 'kid';
+  currentMode = 'kid';   // 考試複習一律用挑戰模式的遊戲清單
+  dailyRole = null;
   renderGameCards();
   goTo('page-games');
   var srcEl = document.getElementById('gameSource');
@@ -920,7 +923,7 @@ async function startMultiExamPractice() {
   var opt = document.createElement('option');
   opt.value = 'exam-multi'; opt.textContent = '已勾選的 ' + picks.length + ' 個考試包'; opt.selected = true;
   srcEl.appendChild(opt);
-  document.getElementById('gamesTitle').textContent = '📝 考試複習 — 選一個遊戲';
+  document.getElementById('gamesTitle').textContent = '📝 考試複習 — 選一個遊戲（挑戰模式）';
 }
 async function openExam(id) {
   currentExamId = id;
