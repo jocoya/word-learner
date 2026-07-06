@@ -75,6 +75,7 @@ const GAMES = [
   { id: 'detective', icon: '🔍', name: '線索偵探',   desc: '認識新字＋聽線索猜字',  modes: ['kid'] },
   { id: 'match',     icon: '🔗', name: '連連看',     desc: '英文連中文',         modes: ['kid'] },
   { id: 'cloze',     icon: '📖', name: '讀句選字',   desc: '讀句子選出單字',     modes: ['kid'] },
+  { id: 'write',     icon: '✍️', name: '手寫單字',   desc: '照著描寫整個單字',   modes: ['kid'] },
 ];
 
 function renderGameCards() {
@@ -756,7 +757,7 @@ async function editWord(id) {
   const tags = (w.tags || []).join(', ');
   const modal = document.getElementById('modal-edit');
   modal.innerHTML = `
-    <div class="modal-content" style="max-width:520px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-content modal-edit-wide" style="max-width:760px;width:94%;max-height:92vh;overflow-y:auto;">
       <h3>編輯單字</h3>
       <div class="form-row">
         <input id="editWord" type="text" placeholder="英文單字" value="${esc(w.word)}" />

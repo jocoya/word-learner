@@ -198,6 +198,11 @@ function gameToRating(payload) {
     return m > 0 ? 1 : 3;
   }
 
+  // 手寫單字（write）：完整寫出整個單字 → 很有效的記憶，給 Easy(4)
+  if (gt === 'write') {
+    return m > 0 ? 2 : 4;
+  }
+
   // 難遊戲：做對代表真的熟，可給 Easy(4)
   // spelling 拼字 / cloze 讀句 / detective 猜字 / fillblank 句子排列 / speak 造句
   if (gt === 'spelling') {
@@ -320,6 +325,7 @@ var GAME_MIN_STABILITY = {
   listen: 0,      // 看字選圖 - 認字配對
   flashlight: 0,  // 探照燈尋寶 - 探索式
   learn: 0,       // 認識新朋友 - 新字學習入口（門檻 0）
+  write: 0,       // 手寫單字 - 描寫練習（門檻 0，任何字都能練）
   bubble: 1,      // 泡泡戳戳樂 - 需要快速反應
   echo: 1,        // 魔法發音動物園 - 跟讀
   spelling: 3,    // 拼字挑戰 - 需要會拼（約熟悉期）
@@ -336,6 +342,7 @@ var GAME_NAMES_ZH = {
   listen: '看字選圖',
   flashlight: '探照燈尋寶',
   learn: '認識新朋友',
+  write: '手寫單字',
   bubble: '泡泡戳戳樂',
   echo: '魔法發音動物園',
   spelling: '拼字挑戰',

@@ -444,6 +444,7 @@ startGame = async function(gameId) {
       case 'detective': initDetectiveGame(area, words); break;
       case 'match':     initMatchGame(area, words); break;
       case 'cloze':     initClozeGame(area, words); break;
+      case 'write':     initWriteGame(area, words); break;
     }
   });
 };
