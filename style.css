@@ -2407,3 +2407,30 @@ body {
   .write-guide { font-size: 280px; }
   .write-word { font-size: 2.4em; }
 }
+
+/* 默寫模式：一格一字母 */
+.write-dict-hint { font-size: 1em; color: #888; margin-top: 6px; }
+.write-boxes {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+  margin: 16px 0;
+}
+.write-box {
+  width: 90px; height: 110px;
+  background: #fff; border: 3px solid #90CAF9; border-radius: 14px;
+  overflow: hidden; position: relative;
+  box-shadow: 0 2px 6px rgba(0,0,0,.1);
+}
+.write-box.ok { border-color: #4CAF50; background: #E8F5E9; }
+.write-box.bad { border-color: #f44336; background: #FFEBEE; }
+.write-box-canvas { width: 100%; height: 100%; touch-action: none; cursor: crosshair; display: block; }
+.write-result { margin-top: 12px; font-size: 1.15em; min-height: 32px; }
+.write-selfcheck {
+  background: #FFF8E1; border-radius: 14px; padding: 14px 18px; display: inline-block;
+}
+.write-selfcheck b { color: #E65100; font-size: 1.3em; letter-spacing: 2px; }
+.write-selfcheck-sub { font-size: .9em; color: #999; margin: 6px 0 10px; }
+.write-selfcheck-btns { display: flex; gap: 12px; justify-content: center; }
+
+@media (min-width: 1000px) {
+  .write-box { width: 120px; height: 150px; }
+}
