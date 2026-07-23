@@ -601,11 +601,13 @@ async function renderReport(child) {
       rec = legacy;
     }
     var p = (typeof fsrsUpgrade === 'function') ? fsrsUpgrade(rec) : rec;
-    var s = p.stability || 0;
     if (!p.reps || p.reps === 0) { notStarted++; continue; }
-    if (s >= 40) stages['大師']++;
-    else if (s >= 15) stages['應用']++;
-    else if (s >= 3) stages['熟悉']++;
+    // 用「真實階段」（stability+次數+天數 三條件）而非只看 stability
+    var lvl = (typeof getWordStageLevel === 'function') ? getWordStageLevel(p)
+              : (p.stability >= 40 ? 3 : p.stability >= 15 ? 2 : p.stability >= 3 ? 1 : 0);
+    if (lvl >= 3) stages['大師']++;
+    else if (lvl === 2) stages['應用']++;
+    else if (lvl === 1) stages['熟悉']++;
     else stages['認識']++;
     if (p.due && p.due <= now) dueCount++;
     if ((p.lapses || 0) >= 2) {

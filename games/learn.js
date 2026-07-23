@@ -158,6 +158,9 @@ async function startLearnSession(config) {
       if (typeof updateProgress === 'function') {
         updateProgress(target.id, correct, 'learn', { mistakes: correct ? 0 : 1 });
       }
+      // 立刻標記「已認識」（不等結算），避免中途離開或測試模式時又重複跳同一個字
+      var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+      if (typeof markFriendsMet === 'function') { markFriendsMet(child, [target.id]); }
       learnedFriends.push(target);
       current++;
       document.getElementById('gameScore').textContent = current + '/' + total;

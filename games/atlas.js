@@ -63,15 +63,21 @@ async function markIslandCleared(child, tag, perfect) {
 }
 
 // 計算島級：島內「所有單字」都達到某門檻，才算島達到該階
-// 回傳 0=尚未全部熟悉 / 1=熟悉關 / 2=應用關 / 3=大師關
-function islandTierFromStabilities(stabs) {
-  if (!stabs.length) return 0;
-  var minS = Math.min.apply(null, stabs);
-  var tier = 0;
-  for (var i = 0; i < ATLAS_TIERS.length; i++) {
-    if (minS >= ATLAS_TIERS[i].s) tier = ATLAS_TIERS[i].tier;
-  }
-  return tier;
+// 取某單字的「真實階段」等級（0認識/1熟悉/2應用/3大師）
+async function atlasWordStage(wordId) {
+  if (typeof getProgressFor !== 'function') return 0;
+  var p = await getProgressFor(wordId);
+  if (!p) return 0;
+  if (typeof fsrsUpgrade === 'function') p = fsrsUpgrade(p);
+  if (typeof getWordStageLevel === 'function') return getWordStageLevel(p);
+  var s = p.stability || 0;
+  return s >= 40 ? 3 : s >= 15 ? 2 : s >= 3 ? 1 : 0;
+}
+
+// 島級 = 島內「所有單字的最低階」（回傳 0~3）
+function islandTierFromLevels(levels) {
+  if (!levels.length) return 0;
+  return Math.min.apply(null, levels);
 }
 
 // 計算某小孩的所有島（含進度）
@@ -87,15 +93,15 @@ async function computeIslands(child) {
       var tag = tags[i];
       var words = await getWordsByTag(tag);
       if (!words.length) continue;
-      var stabs = [];
+      var levels = [];
       var familiar = 0;
       for (var j = 0; j < words.length; j++) {
-        var s = (typeof getWordStability === 'function') ? await getWordStability(words[j].id) : 0;
-        stabs.push(s);
-        if (s >= ATLAS_FAMILIAR_S) familiar++;
+        var lvl = await atlasWordStage(words[j].id);
+        levels.push(lvl);
+        if (lvl >= 1) familiar++;  // 到「熟悉」以上算已熟
       }
       var total = words.length;
-      var tier = islandTierFromStabilities(stabs);      // 0~3：島目前達到的階級
+      var tier = islandTierFromLevels(levels);          // 0~3：島目前達到的階級
       var rec = childCleared[tag] || {};
       var wasCleared = !!rec.cleared;
       var nowAllFamiliar = familiar >= total;
@@ -280,15 +286,17 @@ async function openIsland(tagEnc) {
     // 依熟練度排序：不熟的排前面（提示要練）
     var enriched = [];
     for (var i = 0; i < words.length; i++) {
-      var s = (typeof getWordStability === 'function') ? await getWordStability(words[i].id) : 0;
-      enriched.push({ w: words[i], s: s });
+      var lv = await atlasWordStage(words[i].id);
+      enriched.push({ w: words[i], lv: lv });
     }
-    enriched.sort(function(a, b){ return a.s - b.s; });
+    enriched.sort(function(a, b){ return a.lv - b.lv; });
+    var stageNames = ['認識', '熟悉', '應用', '大師'];
+    var stageClsArr = ['new', 'familiar', 'apply', 'master'];
     enriched.forEach(function(e) {
       var w = e.w;
       var img = (typeof getRandomImage === 'function') ? getRandomImage(w) : '';
-      var stage = e.s >= 40 ? '大師' : e.s >= 15 ? '應用' : e.s >= ATLAS_FAMILIAR_S ? '熟悉' : '認識';
-      var stageCls = e.s >= 40 ? 'master' : e.s >= 15 ? 'apply' : e.s >= ATLAS_FAMILIAR_S ? 'familiar' : 'new';
+      var stage = stageNames[e.lv];
+      var stageCls = stageClsArr[e.lv];
       cards +=
         '<div class="island-card ' + stageCls + '" onclick="speakWord(\'' + esc(w.word) + '\',0.7)">' +
           (img ? '<img class="island-card-img" src="' + img + '" alt="" onerror="this.style.display=\'none\'">'

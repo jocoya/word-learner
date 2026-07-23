@@ -14,11 +14,13 @@ var FIRST_PLAY_SCALE = 0.25; // 第一次玩的初始 stability 縮放（避免�
 var GROWTH_SCALE = 0.28;     // 後續每次 stability 成長幅度縮放（爬升放慢，要常玩才會進步）
 var MIN_ELAPSED_DAYS = 0.3;  // 同一天重複玩時，假設至少間隔的天數（讓連玩也有微量成長）
 
-// 階段門檻（stability）：熟悉期 / 應用期 / 大師期
+// 階段門檻：熟悉期 / 應用期 / 大師期
+// s = 需要的 stability；minReps = 需要「複習過的次數」；minDays = 需要「不同天數」
+// 雙重條件：光是 stability 夠不算數，還要真的練過夠多次、跨夠多天，才算「會應用」
 var STAGE_THRESHOLDS = [
-  { level: 1, s: 3 },   // 熟悉期
-  { level: 2, s: 15 },  // 應用期
-  { level: 3, s: 40 }   // 大師期
+  { level: 1, s: 3,  minReps: 2,  minDays: 2 },  // 熟悉期：至少複習 2 次、跨 2 天
+  { level: 2, s: 18, minReps: 6,  minDays: 4 },  // 應用期：至少 6 次、跨 4 天
+  { level: 3, s: 45, minReps: 12, minDays: 8 }   // 大師期：至少 12 次、跨 8 天
 ];
 
 // ===== 多小孩進度分流 =====
@@ -67,8 +69,9 @@ function fsrsInitProgress(wordId) {
     totalCorrect: 0,
     totalAttempts: 0,
     // 階段獎勵紀錄
-    unlockedStages: [],   // 已解鎖的階段（1=S>=2, 2=S>=8, 3=S>=20）
-    todayReviewed: ''     // 今天最後複習的日期 (YYYY-MM-DD)
+    unlockedStages: [],   // 已解鎖的階段
+    todayReviewed: '',    // 今天最後複習的日期 (YYYY-MM-DD)
+    reviewDays: 0         // 練過的「不同天數」（升級的硬條件之一）
   };
 }
 
@@ -251,6 +254,24 @@ function gameToRating(payload) {
   return 3;
 }
 
+// 取得單字目前的「真實階段」等級（0=認識 1=熟悉 2=應用 3=大師）
+// 一律以 unlockedStages 為準（已通過 stability+reps+天數 三條件才會解鎖）。
+// 只有「非常舊、連 unlockedStages 欄位都沒有」的資料才退回用 stability 粗估。
+function getWordStageLevel(progress) {
+  if (!progress) return 0;
+  var us = progress.unlockedStages;
+  if (Array.isArray(us)) {
+    // 新制資料：階段完全由 unlockedStages 決定（沒解鎖就是認識期，即使 S 很高）
+    return us.length ? Math.max.apply(null, us) : 0;
+  }
+  // 舊資料（無 unlockedStages 欄位）→ 用 stability 粗估
+  var s = progress.stability || 0;
+  if (s >= STAGE_THRESHOLDS[2].s) return 3;
+  if (s >= STAGE_THRESHOLDS[1].s) return 2;
+  if (s >= STAGE_THRESHOLDS[0].s) return 1;
+  return 0;
+}
+
 // 統一入口：遊戲完成時呼叫這個
 // 回傳獎勵資訊：{ rating, coinEarned, diamondEarned, stageUnlocked }
 async function recordGameResult(payload) {
@@ -268,14 +289,21 @@ async function recordGameResult(payload) {
 
   // 套用 FSRS
   var newP = fsrsReview(p, rating);
+  // 累計「不同天數」：今天第一次複習才 +1（同一天玩很多次不重複累加）
+  newP.reviewDays = (p.reviewDays || 0) + (isFirstToday ? 1 : 0);
   newP.todayReviewed = todayStr;
   newP.wordId = progressId(payload.wordId); // 確保 key 是本小孩專屬
 
-  // 檢查階段升級
+  // 檢查階段升級：stability + 複習次數(reps) + 不同天數(reviewDays) 三條件都要達標
+  // 這樣「同一天狂答對」不會直接升級，必須跨天、真的練夠才升 → 符合「會應用」的定義
   var unlockedStages = newP.unlockedStages || [];
   var newStageUnlocked = null;
   STAGE_THRESHOLDS.forEach(function(stage) {
-    if (prevS < stage.s && newP.stability >= stage.s && unlockedStages.indexOf(stage.level) === -1) {
+    if (unlockedStages.indexOf(stage.level) !== -1) return;
+    var meetS = newP.stability >= stage.s;
+    var meetReps = (newP.reps || 0) >= stage.minReps;
+    var meetDays = (newP.reviewDays || 0) >= stage.minDays;
+    if (meetS && meetReps && meetDays) {
       unlockedStages.push(stage.level);
       newStageUnlocked = stage.level;
     }
