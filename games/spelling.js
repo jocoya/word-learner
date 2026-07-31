@@ -28,7 +28,7 @@ function initSpellingGame(area, words) {
         ${img ? `<img class="spell-image" src="${img}" alt="" onerror="this.style.display='none'" />` : ''}
         <div class="spell-meaning">${esc(target.meaning)}</div>
         <button class="listen-play-btn" onclick="speakWord('${esc(target.word)}')" title="聽發音" style="font-size:2em;margin-bottom:12px;">🔊</button>
-        <div class="spell-hint-tip">把下面的字母拖到空格 ✋</div>
+        <div class="spell-hint-tip">點下面的字母填進空格 👆</div>
         <div class="spell-slots" id="spellSlots">
           ${letters.map((l, i) => {
             if (blankIndices.includes(i)) {

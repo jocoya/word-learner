@@ -1346,80 +1346,52 @@ function renderMixEcho(area, target, words, cb) {
   setTimeout(function() { if(!done){done=true;cb(false);} }, 15000);
 }
 
-// ===== 拼字拖放：手指/滑鼠把字母拖到任一個缺塊（觸控友善，Pointer Events）=====
+// ===== 拼字：用「點的」填字母（不拖動，避免卡住）=====
 // slots: NodeList of .spell-slot[data-blank="true"]（依單字順序）
 // bank:  NodeList of .spell-letter
 // onAllFilled(placedLetters): 全部缺塊填滿時呼叫，placedLetters = 依 slot 順序的字母陣列
+// 行為：點字母 → 依序填入下一個空格；點已填的空格 → 退回該字母。
 function attachSpellDrag(area, slots, bank, onAllFilled) {
-  var slotLetter = new Array(slots.length).fill(null); // 每個 slot 目前放的字母 token
+  var slotToken = new Array(slots.length).fill(null); // 每格對應的字母按鈕
   var locked = false;
 
-  function countFilled() { return slotLetter.filter(function(x){ return x; }).length; }
+  function countFilled() { return slotToken.filter(function(x){ return x; }).length; }
+  function nextEmpty() { for (var i = 0; i < slots.length; i++) { if (!slotToken[i]) return i; } return -1; }
 
   function placeToken(token, slotIdx) {
-    // 若該 slot 已有字母，先退回原字母
-    if (slotLetter[slotIdx]) removeFromSlot(slotIdx);
-    slotLetter[slotIdx] = token;
+    slotToken[slotIdx] = token;
     token.classList.add('used');
-    var s = slots[slotIdx];
-    s.textContent = token.dataset.letter;
-    s.classList.add('filled');
+    slots[slotIdx].textContent = token.dataset.letter;
+    slots[slotIdx].classList.add('filled');
     if (countFilled() === slots.length) {
       locked = true;
-      onAllFilled(slotLetter.map(function(t){ return t ? t.dataset.letter : ''; }));
+      onAllFilled(slotToken.map(function(t){ return t ? t.dataset.letter : ''; }));
     }
   }
   function removeFromSlot(slotIdx) {
-    var token = slotLetter[slotIdx];
+    var token = slotToken[slotIdx];
     if (!token) return;
     token.classList.remove('used');
-    slotLetter[slotIdx] = null;
+    slotToken[slotIdx] = null;
     slots[slotIdx].textContent = '';
     slots[slotIdx].classList.remove('filled');
   }
 
-  // 點已填的缺塊 → 退回字母
+  // 點字母 → 放進下一個空格
+  bank.forEach(function(token) {
+    token.addEventListener('click', function() {
+      if (locked || token.classList.contains('used')) return;
+      var idx = nextEmpty();
+      if (idx === -1) return;
+      placeToken(token, idx);
+    });
+  });
+
+  // 點已填的空格 → 退回字母（可重填）
   slots.forEach(function(slot, i) {
     slot.addEventListener('click', function() {
       if (locked) return;
       removeFromSlot(i);
-    });
-  });
-
-  // 每個字母 token：pointer 拖曳
-  bank.forEach(function(token) {
-    token.addEventListener('pointerdown', function(e) {
-      if (locked || token.classList.contains('used')) return;
-      e.preventDefault();
-      var ghost = token.cloneNode(true);
-      ghost.className = 'spell-letter spell-ghost';
-      document.body.appendChild(ghost);
-      var moved = false;
-      function moveGhost(x, y) {
-        ghost.style.left = x + 'px';
-        ghost.style.top = y + 'px';
-      }
-      moveGhost(e.clientX, e.clientY);
-      function onMove(ev) { moved = true; moveGhost(ev.clientX, ev.clientY); }
-      function onUp(ev) {
-        document.removeEventListener('pointermove', onMove);
-        document.removeEventListener('pointerup', onUp);
-        ghost.style.display = 'none';
-        var el = document.elementFromPoint(ev.clientX, ev.clientY);
-        ghost.remove();
-        if (locked) return;
-        var slot = el && el.closest ? el.closest('.spell-slot[data-blank="true"]') : null;
-        if (slot) {
-          var idx = Array.prototype.indexOf.call(slots, slot);
-          if (idx !== -1) { placeToken(token, idx); return; }
-        }
-        // 沒放到缺塊：若只是輕點（沒移動）→ 自動放進第一個空缺塊
-        if (!moved) {
-          for (var i = 0; i < slots.length; i++) { if (!slotLetter[i]) { placeToken(token, i); break; } }
-        }
-      }
-      document.addEventListener('pointermove', onMove);
-      document.addEventListener('pointerup', onUp);
     });
   });
 }
@@ -1440,7 +1412,7 @@ function renderMixSpelling(area, target, cb) {
       (img ? '<img class="spell-image" src="' + img + '" alt="" onerror="this.style.display=\'none\'" />' : '') +
       '<div class="spell-meaning">' + esc(target.meaning) + '</div>' +
       '<button class="listen-play-btn" onclick="speakWord(\'' + esc(target.word) + '\')" title="聽發音" style="font-size:2em;margin-bottom:12px;">🔊</button>' +
-      '<div class="spell-hint-tip">把下面的字母拖到空格 ✋</div>' +
+      '<div class="spell-hint-tip">點下面的字母填進空格 👆</div>' +
       '<div class="spell-slots" id="spellSlots">' +
         letters.map(function(l, i) {
           return blankIndices.indexOf(i) !== -1
