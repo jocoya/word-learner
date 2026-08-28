@@ -69,7 +69,7 @@ function buildLetterSkeleton(word, revealCount) {
   }).join(' ');
 }
 
-function initDetectiveGame(area, words) {
+async function initDetectiveGame(area, words) {
   var supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
   var withSentence = words.filter(function(w) { return w.sentences && w.sentences.length > 0; });
 
@@ -86,7 +86,7 @@ function initDetectiveGame(area, words) {
     area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有例句的單字！</p>';
     return;
   }
-  var total = Math.min(8, withSentence.length);
+  var total = Math.min(5, withSentence.length);
 
   // 若有主題篩選，先把單字池縮到該主題
   if (learnFirst && themeFilter) {
@@ -102,7 +102,7 @@ function initDetectiveGame(area, words) {
   var learnReward = learnConfig ? learnConfig.reward : 'coin';   // 'coin' | 'diamond'
   var learnCount = learnConfig ? learnConfig.count : 2;          // 認識幾個新朋友
 
-  function buildQueueAndStart() {
+  async function buildQueueAndStart() {
     if (learnFirst) {
       // 只挑「認識期」的字（reps=0 或 S<3），優先沒學過的
       var enriched = [];
@@ -125,7 +125,13 @@ function initDetectiveGame(area, words) {
         });
       });
     } else {
-      queue = shuffleArray(withSentence).slice(0, total);
+      var state = (typeof prepareChallengeQueue === 'function')
+        ? await prepareChallengeQueue('detective', withSentence, 5)
+        : { queue: shuffleArray(withSentence).slice(0, total), current: 0, correct: 0, total: total };
+      queue = state.queue;
+      current = state.current;
+      correct = state.correct;
+      total = state.total;
       renderRound();
     }
   }
@@ -303,13 +309,24 @@ function initDetectiveGame(area, words) {
       });
     }
 
-    function finishLearn(wasCorrect) {
+    var learnAnswered = false;
+    async function finishLearn(wasCorrect) {
+      if (learnAnswered) return;
+      learnAnswered = true;
       // 認識新朋友：依確認題對錯記錄（reps=0 首玩會被首玩封頂壓在認識期，不暴衝）
       // 沒作答（例如沒有 confirm 步驟）預設視為答對
-      var correct = (wasCorrect !== false);
-      updateProgress(target.id, correct, 'learn', { mistakes: correct ? 0 : 1 });
-      learnedFriends.push(target);
+      var answerCorrect = (wasCorrect !== false);
+      var extra = {
+        mistakes: answerCorrect ? 0 : 1,
+        answerId: (!learnFirst && typeof makeChallengeAnswerId === 'function') ? makeChallengeAnswerId('detective', current, target.id) : null
+      };
+      await updateProgress(target.id, answerCorrect, 'learn', extra);
+      if (learnFirst) learnedFriends.push(target);
+      else if (answerCorrect) correct++;
       current++;
+      if (!learnFirst && typeof checkpointGameChallenge === 'function') {
+        await checkpointGameChallenge('detective', current, correct, total);
+      }
       renderRound();
     }
 
@@ -466,34 +483,46 @@ function initDetectiveGame(area, words) {
       recognition.start();
     };
 
-    function win(mistakes) {
+    async function saveDetectiveAnswer(isCorrect, mistakes) {
+      var extra = {
+        mistakes: mistakes,
+        answerId: (typeof makeChallengeAnswerId === 'function') ? makeChallengeAnswerId('detective', current, target.id) : null
+      };
+      await updateProgress(target.id, isCorrect, 'detective', extra);
+      current++;
+      if (typeof checkpointGameChallenge === 'function') {
+        await checkpointGameChallenge('detective', current, correct, total);
+      }
+    }
+
+    async function win(mistakes) {
       if (answered) return;
       answered = true;
       correct++;
       speakWord(target.word, 0.7);
-      updateProgress(target.id, true, 'detective', { mistakes: mistakes });
       document.getElementById('gameScore').textContent = correct + ' / ' + (current+1);
       document.getElementById('det2Skeleton').innerHTML = '<span class="det2-answer">' + esc(target.word) + '</span>';
       document.getElementById('det2Feedback').innerHTML = '<span class="det2-win">🎉 答對了！</span>';
-      setTimeout(function() { current++; renderRound(); }, 2200);
+      await saveDetectiveAnswer(true, mistakes);
+      setTimeout(renderRound, 2200);
     }
-    function lose() {
+    async function lose() {
       if (answered) return;
       answered = true;
       speakWord(target.word, 0.7);
-      updateProgress(target.id, false, 'detective', { mistakes: 2 });
       document.getElementById('det2Skeleton').innerHTML = '<span class="det2-answer">' + esc(target.word) + '</span>';
       document.getElementById('det2Feedback').innerHTML = '<span class="det2-try">正確答案：' + esc(target.word) + '</span>';
-      setTimeout(function() { current++; renderRound(); }, 2200);
+      await saveDetectiveAnswer(false, 2);
+      setTimeout(renderRound, 2200);
     }
 
-    window.skipDetective = function() {
+    window.skipDetective = async function() {
       if (answered) return;
       answered = true;
-      updateProgress(target.id, false, 'detective', { mistakes: 2 });
       speakWord(target.word, 0.7);
       document.getElementById('det2Skeleton').innerHTML = '<span class="det2-answer">' + esc(target.word) + '</span>';
-      setTimeout(function() { current++; renderRound(); }, 1500);
+      await saveDetectiveAnswer(false, 2);
+      setTimeout(renderRound, 1500);
     };
   }
   buildQueueAndStart();

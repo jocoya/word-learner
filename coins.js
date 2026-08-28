@@ -137,7 +137,37 @@ async function confirmRedeem() {
 
 // 連續遊玩的鑽石獎勵已移到 app.js 的 checkStreakDiamond（挑戰完成時觸發，連續 5 天給鑽石）
 
-function showChestModal() {
+// 目前寶箱的模式與歸屬；歸屬在排入佇列時固定，避免等待期間切換角色後發錯人。
+var _chestItem = { mode: 'default', child: 'boy' };
+
+// 「玩超過 5 次」寶箱：80% 金幣 / 15% 鑽石 / 5% 禮券（4 種隨機一個）
+function pickPlayReward() {
+  var r = Math.random() * 100;
+  if (r < 80) return { key: 'coin', name: '金幣', img: null };          // 80%
+  if (r < 95) return { key: 'diamond', name: '鑽石', img: './images/diamond.png' }; // 15%
+  // 5% 禮券：4 種隨機
+  var vouchers = REWARDS.filter(function(x){ return x.key !== 'diamond'; });
+  return vouchers[Math.floor(Math.random() * vouchers.length)];
+}
+
+// 寶箱佇列：避免多個寶箱同時彈出互相蓋掉
+var _chestQueue = [];
+var _chestShowing = false;
+
+// mode: 'default' | 'play'
+function showChestModal(mode, child, awardId) {
+  _chestQueue.push({
+    mode: mode === 'play' ? 'play' : 'default',
+    child: child || ((typeof currentChild !== 'undefined') ? currentChild : 'boy'),
+    awardId: awardId || null
+  });
+  if (!_chestShowing) _showNextChest();
+}
+
+function _showNextChest() {
+  if (_chestQueue.length === 0) { _chestShowing = false; return; }
+  _chestShowing = true;
+  _chestItem = _chestQueue.shift();
   var img = document.getElementById('chestImg');
   img.src = './images/BOX.png';
   img.className = 'chest-img chest-shake';
@@ -153,28 +183,84 @@ async function openChest() {
   img.src = './images/OPEN%20BOX.png';
   img.classList.add('chest-open-anim');
   img.style.pointerEvents = 'none';
-  var reward = pickWeightedReward();
+  var item = _chestItem;
+  var reward = item.mode === 'play' ? pickPlayReward() : pickWeightedReward();
   setTimeout(async function() {
     document.getElementById('chestStage').hidden = true;
     document.getElementById('chestReward').hidden = false;
-    document.getElementById('chestRewardImg').innerHTML = '<img src="' + reward.img + '">';
+    // 金幣沒有圖檔 → 用寶箱所屬小孩的金幣圖
+    var rewardImg = reward.img;
+    if (reward.key === 'coin') {
+      rewardImg = item.child === 'girl' ? './images/COIN_DOG.png' : './images/COIN_CAT.png';
+    }
+    document.getElementById('chestRewardImg').innerHTML = '<img src="' + rewardImg + '">';
     document.getElementById('chestRewardText').textContent = '獲得 ' + reward.name + '！';
     // 測試模式：只播動畫，不寫入獎勵
     if (typeof devSkipRewards === 'function' && devSkipRewards()) return;
+    // 若同一個 pending 寶箱已領過，直接略過，避免 callback／重開重複發獎。
+    if (item.awardId) {
+      var playCount = await dbGet('settings', 'playCount');
+      var pendingForChild = playCount && playCount.pendingChests ? playCount.pendingChests[item.child] : null;
+      if (!pendingForChild || pendingForChild.id !== item.awardId) {
+        document.getElementById('chestRewardText').textContent = '這個寶箱已經領過囉！';
+        return;
+      }
+    }
     var coins = await getCoins();
-    // 寶箱獎勵歸給「目前小孩」
-    var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
-    var rewards = getChildRewards(coins, child);
-    rewards[reward.key] = (rewards[reward.key] || 0) + 1;
+    if (!Array.isArray(coins.chestAwardIds)) coins.chestAwardIds = [];
+    if (item.awardId && coins.chestAwardIds.indexOf(item.awardId) !== -1) {
+      var alreadyClaimed = await dbGet('settings', 'playCount');
+      if (alreadyClaimed && alreadyClaimed.pendingChests && alreadyClaimed.pendingChests[item.child] && alreadyClaimed.pendingChests[item.child].id === item.awardId) {
+        delete alreadyClaimed.pendingChests[item.child];
+        await dbPut('settings', alreadyClaimed);
+      }
+      document.getElementById('chestRewardText').textContent = '這個寶箱已經領過囉！';
+      return;
+    }
+    var child = item.child;
+    if (reward.key === 'coin') {
+      // 金幣直接加到該小孩的金幣數
+      coins[child] = (coins[child] || 0) + 1;
+    } else {
+      var rewards = getChildRewards(coins, child);
+      rewards[reward.key] = (rewards[reward.key] || 0) + 1;
+    }
     coins.lastChestDate = getTodayStr();
-    coins.log.push({ role: child, count: 0, date: getTodayStr(), chest: reward.name });
+    coins.log.push({ role: child, count: reward.key === 'coin' ? 1 : 0, date: getTodayStr(), chest: reward.name });
+    if (item.awardId) {
+      coins.chestAwardIds.push(item.awardId);
+      if (coins.chestAwardIds.length > 80) coins.chestAwardIds = coins.chestAwardIds.slice(-80);
+    }
     await saveCoins(coins);
+    if (item.awardId) {
+      var latestPlayCount = await dbGet('settings', 'playCount');
+      if (latestPlayCount && latestPlayCount.pendingChests && latestPlayCount.pendingChests[item.child] && latestPlayCount.pendingChests[item.child].id === item.awardId) {
+        delete latestPlayCount.pendingChests[item.child];
+        await dbPut('settings', latestPlayCount);
+      }
+    }
   }, 800);
 }
 
 function closeChestModal() {
   hideModal('modal-chest');
-  renderCoinPage();
+  // 還有排隊的寶箱 → 接著開下一個；否則刷新金幣頁
+  if (_chestQueue.length > 0) {
+    setTimeout(_showNextChest, 250);
+  } else {
+    _chestShowing = false;
+    renderCoinPage();
+  }
+}
+
+// 若第六場達標後 App 在開箱前被系統回收，重開後補回尚未領取的寶箱。
+async function offerPendingPlayChest() {
+  var s = await dbGet('settings', 'playCount');
+  if (!s || s.date !== getTodayStr() || !s.pendingChests) return;
+  ['boy', 'girl'].forEach(function(child) {
+    var p = s.pendingChests[child];
+    if (p) showChestModal('play', child, p.id);
+  });
 }
 
 // 覆蓋 renderCalendar — 用圖片代替 emoji

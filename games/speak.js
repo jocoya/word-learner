@@ -1,15 +1,18 @@
 // 看圖說句遊戲
-function initSpeakGame(area, words) {
+async function initSpeakGame(area, words) {
   const supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
   if (!supported) {
     area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">你的瀏覽器不支援語音辨識，請使用 Chrome 瀏覽器。</p>';
     return;
   }
 
-  const total = Math.min(8, words.length);
-  const queue = shuffleArray(words).slice(0, total);
-  let current = 0;
-  let correct = 0;
+  const state = (typeof prepareChallengeQueue === 'function')
+    ? await prepareChallengeQueue('speak', words, 5)
+    : { queue: shuffleArray(words).slice(0, Math.min(5, words.length)), current: 0, correct: 0, total: Math.min(5, words.length) };
+  const total = state.total;
+  const queue = state.queue;
+  let current = state.current;
+  let correct = state.correct;
 
   function renderQuestion() {
     if (current >= queue.length) {
@@ -35,6 +38,7 @@ function initSpeakGame(area, words) {
     const micBtn = document.getElementById('micBtn');
     const transcriptEl = document.getElementById('transcript');
     let recognition = null;
+    let answered = false;
 
     micBtn.addEventListener('click', () => {
       if (recognition) {
@@ -50,7 +54,7 @@ function initSpeakGame(area, words) {
       micBtn.classList.add('recording');
       transcriptEl.textContent = '正在聽...';
 
-      recognition.onresult = (e) => {
+      recognition.onresult = async (e) => {
         let transcript = '';
         for (let i = 0; i < e.results.length; i++) {
           transcript += e.results[i][0].transcript;
@@ -58,7 +62,8 @@ function initSpeakGame(area, words) {
         transcriptEl.textContent = transcript || '...';
 
         // 檢查是否包含目標單字
-        if (e.results[0].isFinal) {
+        if (e.results[0].isFinal && !answered) {
+          answered = true;
           const lower = transcript.toLowerCase();
           const wordLower = target.word.toLowerCase();
           const found = lower.includes(wordLower);
@@ -71,11 +76,18 @@ function initSpeakGame(area, words) {
             transcriptEl.style.background = '#fff3e0';
           }
           var spokenWords = transcript.trim().split(/\s+/).filter(Boolean).length;
-          updateProgress(target.id, found, 'speak', { mistakes: found ? 0 : 1, spokenWords: spokenWords });
+          var extra = {
+            mistakes: found ? 0 : 1,
+            spokenWords: spokenWords,
+            answerId: (typeof makeChallengeAnswerId === 'function') ? makeChallengeAnswerId('speak', current, target.id) : null
+          };
+          await updateProgress(target.id, found, 'speak', extra);
           document.getElementById('gameScore').textContent = `${correct} / ${current + 1}`;
           micBtn.classList.remove('recording');
           recognition = null;
-          setTimeout(() => { current++; renderQuestion(); }, 2500);
+          current++;
+          if (typeof checkpointGameChallenge === 'function') await checkpointGameChallenge('speak', current, correct, total);
+          setTimeout(renderQuestion, 2500);
         }
       };
 

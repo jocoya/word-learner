@@ -14,6 +14,12 @@ async function updateGameSource() {
 }
 
 async function getGameWords(gameType) {
+  // 恢復挑戰時直接使用場次內固定的單字，不重新抽題或套用今日 due 排序。
+  if (typeof _resumeWordsOverride !== 'undefined' && _resumeWordsOverride) {
+    var resumedWords = _resumeWordsOverride;
+    _resumeWordsOverride = null;
+    return resumedWords;
+  }
   var source = document.getElementById('gameSource') ? document.getElementById('gameSource').value : 'permanent';
   var tagFilter = document.getElementById('gameTagFilter') ? document.getElementById('gameTagFilter').value : 'all';
   var words;
@@ -71,6 +77,173 @@ async function getGameWords(gameType) {
     words = scored.map(function(x){ return x.w; });
   }
   return words;
+}
+
+// ===== 挑戰中斷恢復（每題完成後 checkpoint）=====
+var activeChallengeSession = null;
+var _resumeWordsOverride = null;
+var _resumingActiveChallenge = false;
+var RESUMABLE_GAMES = { fillblank: true, speak: true, detective: true };
+
+function newChallengeId() {
+  return 'challenge-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+}
+
+function getActiveChallengeSession() { return activeChallengeSession; }
+
+async function saveActiveChallenge(session) {
+  if (!session) return;
+  session.key = 'activeSession';
+  session.version = 1;
+  session.updatedAt = Date.now();
+  activeChallengeSession = session;
+  await dbPutLocal('settings', session);
+}
+
+async function clearActiveChallenge() {
+  var old = activeChallengeSession || await dbGet('settings', 'activeSession');
+  activeChallengeSession = null;
+  await dbPutLocal('settings', {
+    key: 'activeSession', version: 1, status: 'done',
+    id: old && old.id ? old.id : null, updatedAt: Date.now()
+  });
+}
+
+async function beginGameChallenge(gameId, words) {
+  var src = document.getElementById('gameSource');
+  var source = src ? src.value : 'permanent';
+  var kind = source === 'exam-multi' || source.indexOf('exam-') === 0 ? 'exam' : 'game';
+  await saveActiveChallenge({
+    id: newChallengeId(), status: 'active', kind: kind, gameId: gameId,
+    mode: currentMode, child: currentChild || 'boy', source: source,
+    wordIds: words.map(function(w) { return w.id; }), queueIds: [],
+    current: 0, correct: 0, total: 0
+  });
+}
+
+async function prepareChallengeQueue(gameId, eligibleWords, limit) {
+  var s = activeChallengeSession;
+  var queue;
+  if (s && s.status === 'active' && s.gameId === gameId && s.queueIds && s.queueIds.length) {
+    var byId = {};
+    eligibleWords.forEach(function(w) { byId[String(w.id)] = w; });
+    queue = s.queueIds.map(function(id) { return byId[String(id)]; }).filter(Boolean);
+  } else {
+    queue = shuffleArray(eligibleWords).slice(0, Math.min(limit, eligibleWords.length));
+    if (!s || s.status !== 'active' || s.gameId !== gameId) {
+      await beginGameChallenge(gameId, eligibleWords);
+      s = activeChallengeSession;
+    }
+    s.queueIds = queue.map(function(w) { return w.id; });
+    s.current = 0;
+    s.correct = 0;
+    s.total = queue.length;
+    await saveActiveChallenge(s);
+  }
+  return {
+    queue: queue,
+    current: Math.min(s.current || 0, queue.length),
+    correct: s.correct || 0,
+    total: queue.length
+  };
+}
+
+function makeChallengeAnswerId(gameId, index, wordId) {
+  var s = activeChallengeSession;
+  if (!s || s.status !== 'active') return null;
+  return s.id + ':' + (s.segmentIndex != null ? s.segmentIndex : gameId) + ':' + index + ':' + wordId;
+}
+
+async function checkpointGameChallenge(gameId, current, correct, total) {
+  var s = activeChallengeSession;
+  if (!s || s.status !== 'active' || s.gameId !== gameId) return;
+  s.current = current;
+  s.correct = correct;
+  s.total = total;
+  await saveActiveChallenge(s);
+}
+
+async function markActiveChallengeFinishing(correct, total) {
+  var s = activeChallengeSession;
+  if (!s) return;
+  s.status = 'finishing';
+  s.correct = correct;
+  s.total = total;
+  await saveActiveChallenge(s);
+}
+
+async function loadWordsByIds(ids) {
+  var result = [];
+  for (var i = 0; i < (ids || []).length; i++) {
+    var w = await dbGet('words', ids[i]);
+    if (w) result.push(w);
+  }
+  return result;
+}
+
+function restoreGameSource(source) {
+  var el = document.getElementById('gameSource');
+  if (!el || !source) return;
+  var option = Array.from(el.options).find(function(o) { return o.value === source; });
+  if (!option) {
+    option = document.createElement('option');
+    option.value = source;
+    option.textContent = source.indexOf('exam-') === 0 ? '恢復中的考試包' : source;
+    el.appendChild(option);
+  }
+  el.value = source;
+}
+
+async function continueActiveChallenge() {
+  var modal = document.getElementById('modal-resume');
+  if (modal) modal.hidden = true;
+  var s = activeChallengeSession || await dbGet('settings', 'activeSession');
+  if (!s || (s.status !== 'active' && s.status !== 'finishing')) return;
+  activeChallengeSession = s;
+  currentChild = s.child || 'boy';
+  currentMode = s.mode || 'kid';
+  dailyRole = s.kind === 'daily' ? s.child : null;
+  if (typeof updateChildSwitchUI === 'function') updateChildSwitchUI();
+  if (s.status === 'finishing') {
+    await showResult(s.correct || 0, s.total || 0);
+    return;
+  }
+  if (s.kind === 'daily') {
+    await runDailyChallengeSession(s);
+    return;
+  }
+  var words = await loadWordsByIds(s.wordIds && s.wordIds.length ? s.wordIds : s.queueIds);
+  if (!words.length || !RESUMABLE_GAMES[s.gameId]) {
+    await discardActiveChallenge();
+    alert('找不到上次挑戰的題目，已回到首頁。');
+    return;
+  }
+  restoreGameSource(s.source);
+  currentGameWords = words;
+  _resumeWordsOverride = words;
+  _resumingActiveChallenge = true;
+  try { await startGame(s.gameId); }
+  finally { _resumingActiveChallenge = false; }
+}
+
+async function discardActiveChallenge() {
+  var modal = document.getElementById('modal-resume');
+  if (modal) modal.hidden = true;
+  await clearActiveChallenge();
+  dailyRole = null;
+  goTo('page-home');
+  if (typeof offerPendingPlayChest === 'function') await offerPendingPlayChest();
+}
+
+async function offerActiveChallengeResume() {
+  var s = await dbGet('settings', 'activeSession');
+  if (!s || (s.status !== 'active' && s.status !== 'finishing')) return;
+  activeChallengeSession = s;
+  var desc = document.getElementById('resumeDesc');
+  var gameName = s.kind === 'daily' ? '每日挑戰' : (GAME_NAMES_ZH[s.gameId] || '挑戰');
+  if (desc) desc.textContent = '上次的「' + gameName + '」還沒完成，要從下一個未完成題目繼續嗎？';
+  var modal = document.getElementById('modal-resume');
+  if (modal) modal.hidden = false;
 }
 
 // ===== 每日挑戰：固定流程 + FSRS 區段篩選 + 程度自適應 =====
@@ -176,42 +349,32 @@ function showSegmentBanner(text, callback) {
 // 主入口：取代原本的 startDailyWithRole
 startDailyWithRole = async function(role) {
   dailyRole = role;
-  currentChild = role; // 每日挑戰的小孩 = 進度歸屬的小孩
+  currentChild = role;
   if (typeof updateChildSwitchUI === 'function') updateChildSwitchUI();
   currentMode = 'kid';
   resetSession();
 
-  // 取得所有 due 單字
   var dueWords = await getDueWordsFSRS('permanent');
-  if (dueWords.length < 4) {
-    // 沒有 due，用全部永久庫
-    dueWords = await dbGetByIndex('words', 'pool', 'permanent');
-  }
+  if (dueWords.length < 4) dueWords = await dbGetByIndex('words', 'pool', 'permanent');
   if (dueWords.length < 4) {
     alert('單字不夠，至少需要 4 個！\n請先到「管理單字」加幾個單字。');
     return;
   }
 
-  // 規劃今天的流程
   var plan = await planDailyChallenge(role);
-
-  // 為每個區段挑單字
   var segments = [];
   for (var i = 0; i < plan.length; i++) {
     var seg = plan[i];
     var picked = await pickWordsByMinStability(dueWords, seg.minS, seg.count);
     if (seg.gameType === 'fillblank') {
-      // 句子排列只能用有例句的單字
       picked = picked.filter(function(w) {
         return w.sentences && w.sentences.some(function(s) { return s && s.trim().split(/\s+/).length >= 2; });
       });
     }
     if (seg.count === 0) {
-      // 一局多字（bubble / memory）：至少要 4 個才能玩
-      if (picked.length >= 4) segments.push({ gameType: seg.gameType, words: picked, multi: true, rounds: seg.rounds || 0, memMode: seg.memMode || null });
-    } else {
-      // 一般區段：有幾個算幾個（不足 count 就用現有的，至少 1 個才納入）
-      if (picked.length >= 1) segments.push({ gameType: seg.gameType, words: picked.slice(0, seg.count), multi: false });
+      if (picked.length >= 4) segments.push({ gameType: seg.gameType, wordIds: picked.map(function(w) { return w.id; }), multi: true, rounds: seg.rounds || 0, memMode: seg.memMode || null });
+    } else if (picked.length >= 1) {
+      segments.push({ gameType: seg.gameType, wordIds: picked.slice(0, seg.count).map(function(w) { return w.id; }), multi: false });
     }
   }
 
@@ -220,23 +383,54 @@ startDailyWithRole = async function(role) {
     return;
   }
 
-  // 進入遊戲頁，依序跑各區段
+  var totalQuestions = segments.reduce(function(sum, s) { return sum + (s.multi ? 1 : s.wordIds.length); }, 0);
+  var session = {
+    id: newChallengeId(), status: 'active', kind: 'daily', gameId: 'daily',
+    mode: 'kid', child: role, source: 'permanent',
+    dueWordIds: dueWords.map(function(w) { return w.id; }), segments: segments,
+    segmentIndex: 0, questionIndex: 0, doneQuestions: 0,
+    correct: 0, total: totalQuestions
+  };
+  await saveActiveChallenge(session);
+  await runDailyChallengeSession(session);
+};
+
+async function runDailyChallengeSession(session) {
+  activeChallengeSession = session;
+  dailyRole = session.child;
+  currentChild = session.child;
+  currentMode = 'kid';
+  if (typeof updateChildSwitchUI === 'function') updateChildSwitchUI();
+
+  var dueWords = await loadWordsByIds(session.dueWordIds || []);
+  if (dueWords.length < 4) dueWords = await dbGetByIndex('words', 'pool', 'permanent');
+  var segments = [];
+  for (var i = 0; i < (session.segments || []).length; i++) {
+    var saved = session.segments[i];
+    var segmentWords = await loadWordsByIds(saved.wordIds || []);
+    if (segmentWords.length) segments.push(Object.assign({}, saved, { words: segmentWords }));
+  }
+  if (!segments.length || dueWords.length < 4) {
+    await clearActiveChallenge();
+    alert('找不到上次每日挑戰的題目，請重新開始。');
+    goTo('page-home');
+    return;
+  }
+
   goTo('page-game');
-  document.getElementById('gameTitle').textContent = (role === 'boy' ? '👦' : '👧') + ' 每日挑戰';
+  document.getElementById('gameTitle').textContent = (session.child === 'boy' ? '👦' : '👧') + ' 每日挑戰';
   document.getElementById('gameScore').textContent = '';
   var area = document.getElementById('gameArea');
   area.innerHTML = '';
 
-  var totalQuestions = segments.reduce(function(sum, s) {
-    return sum + (s.multi ? 1 : s.words.length);
-  }, 0);
-  var doneQuestions = 0;
-  var correctQuestions = 0;
-  var segIdx = 0;
+  var totalQuestions = session.total || segments.reduce(function(sum, s) { return sum + (s.multi ? 1 : s.words.length); }, 0);
+  var doneQuestions = session.doneQuestions || 0;
+  var correctQuestions = session.correct || 0;
+  var segIdx = session.segmentIndex || 0;
+  var inSegDone = session.questionIndex || 0;
 
   function runNextSegment() {
     if (segIdx >= segments.length) {
-      // 全部跑完
       showResult(correctQuestions, totalQuestions);
       return;
     }
@@ -249,12 +443,15 @@ startDailyWithRole = async function(role) {
   }
 
   function runSegment(seg) {
-    var inSegDone = 0;
     var totalInSeg = seg.words.length;
 
-    function nextInSeg() {
+    async function nextInSeg() {
       if (inSegDone >= totalInSeg) {
         segIdx++;
+        inSegDone = 0;
+        session.segmentIndex = segIdx;
+        session.questionIndex = 0;
+        await saveActiveChallenge(session);
         runNextSegment();
         return;
       }
@@ -262,20 +459,28 @@ startDailyWithRole = async function(role) {
       var others = shuffleArray(dueWords.filter(function(w) { return w.id !== target.id; })).slice(0, 3);
       var options = shuffleArray([target].concat(others));
       document.getElementById('gameScore').textContent = (doneQuestions + 1) + '/' + totalQuestions;
-
       area.innerHTML = '';
-      function onAnswer(isCorrect, payload) {
+      var answering = false;
+
+      async function onAnswer(isCorrect, payload) {
+        if (answering) return;
+        answering = true;
         var extra = payload || { mistakes: isCorrect ? 0 : 1 };
-        // skip:true 代表這題沒有可用內容（例如沒例句），不計分、不寫 FSRS
         if (!(extra && extra.skip)) {
-          updateProgress(target.id, isCorrect, seg.gameType, extra);
+          extra.answerId = makeChallengeAnswerId(seg.gameType, inSegDone, target.id);
+          await updateProgress(target.id, isCorrect, seg.gameType, extra);
           if (isCorrect) correctQuestions++;
           doneQuestions++;
         } else {
           totalQuestions = Math.max(0, totalQuestions - 1);
         }
-        document.getElementById('gameScore').textContent = correctQuestions + '/' + totalQuestions;
         inSegDone++;
+        session.questionIndex = inSegDone;
+        session.doneQuestions = doneQuestions;
+        session.correct = correctQuestions;
+        session.total = totalQuestions;
+        await saveActiveChallenge(session);
+        document.getElementById('gameScore').textContent = correctQuestions + '/' + totalQuestions;
         setTimeout(nextInSeg, (extra && extra.skip) ? 0 : 1200);
       }
 
@@ -289,16 +494,25 @@ startDailyWithRole = async function(role) {
     }
 
     if (seg.multi) {
-      // 一局多字（bubble / memory）— 遊戲內部已自己呼叫 updateProgress 寫 FSRS，
-      // 這裡只透過 hook showResult 收結算結果，避免雙寫
-      runFullGameSegment(area, seg.gameType, seg.words, function(correctCount, totalCount) {
-        var success = correctCount >= Math.ceil(totalCount * 0.6);
-        if (success) correctQuestions++;
-        doneQuestions++;
-        document.getElementById('gameScore').textContent = correctQuestions + '/' + totalQuestions;
-        segIdx++;
-        setTimeout(runNextSegment, 1500);
-      }, seg.rounds, seg.memMode);
+      // 翻牌／泡泡中斷時從該小關開頭恢復；answerId 會避免同一單字重複寫 FSRS。
+      inSegDone = 0;
+      session.questionIndex = 0;
+      saveActiveChallenge(session).then(function() {
+        runFullGameSegment(area, seg.gameType, seg.words, async function(correctCount, totalCount) {
+          var success = correctCount >= Math.ceil(totalCount * 0.6);
+          if (success) correctQuestions++;
+          doneQuestions++;
+          segIdx++;
+          inSegDone = 0;
+          session.segmentIndex = segIdx;
+          session.questionIndex = 0;
+          session.doneQuestions = doneQuestions;
+          session.correct = correctQuestions;
+          await saveActiveChallenge(session);
+          document.getElementById('gameScore').textContent = correctQuestions + '/' + totalQuestions;
+          setTimeout(runNextSegment, 1500);
+        }, seg.rounds, seg.memMode);
+      });
     } else {
       nextInSeg();
     }
@@ -423,6 +637,11 @@ var _originalStartGame = startGame;
 startGame = async function(gameId) {
   var words = await getGameWords(gameId);
   if (!words) return;
+  if (RESUMABLE_GAMES[gameId] && !_resumingActiveChallenge && !(typeof window !== 'undefined' && window.detectiveLearnFirst)) {
+    await beginGameChallenge(gameId, words);
+  } else if (!RESUMABLE_GAMES[gameId] && !_resumingActiveChallenge && activeChallengeSession) {
+    await clearActiveChallenge();
+  }
   currentGameWords = words;
   document.getElementById('gameTitle').textContent = GAMES.find(function(g){return g.id===gameId;}).name;
   document.getElementById('gameScore').textContent = '';
@@ -459,6 +678,11 @@ function resetSession() {
   sessionEasyStreak = 0;
   sessionDiamondsEarned = 0;
   sessionStageUnlocks = [];
+  // 每次真正開始一場遊戲都換 run ID；showResult 以此防止同一場重複計次／發獎。
+  if (typeof _currentGameRunId !== 'undefined') {
+    _currentGameRunId = 'run-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+    _finishedGameRunId = null;
+  }
 }
 
 // 統一的遊戲結算入口（取代原本各遊戲的 updateProgress）
@@ -535,8 +759,12 @@ updateProgress = async function(wordId, correct, gameType, extra) {
       timeUsed: extra && extra.timeUsed != null ? extra.timeUsed : 0,
       hintUsed: extra && extra.hintUsed != null ? extra.hintUsed : 0,
       mode: (typeof currentMode !== 'undefined') ? currentMode : 'kid',
-      spokenWords: extra && extra.spokenWords != null ? extra.spokenWords : 0
+      spokenWords: extra && extra.spokenWords != null ? extra.spokenWords : 0,
+      answerId: extra && extra.answerId ? extra.answerId : null
     };
+    if (!payload.answerId && activeChallengeSession && activeChallengeSession.kind === 'daily' && activeChallengeSession.status === 'active') {
+      payload.answerId = makeChallengeAnswerId(gameType, activeChallengeSession.questionIndex || 0, wordId);
+    }
     return await finishWordRound(payload);
   }
   // 沒有 gameType 就走舊邏輯（向後相容）
@@ -550,9 +778,18 @@ startGame = async function(gameId) {
   return await _origStartGame2(gameId);
 };
 
-// ===== 啟動：載入上次選的小孩 =====
-if (typeof loadCurrentChild === 'function') {
-  loadCurrentChild();
+// ===== 啟動：載入上次選的小孩，資料同步完成後詢問是否恢復挑戰 =====
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', function() {
+    var ready = (typeof dataReadyPromise !== 'undefined') ? dataReadyPromise : Promise.resolve();
+    ready.then(async function() {
+      if (typeof loadCurrentChild === 'function') await loadCurrentChild();
+      await offerActiveChallengeResume();
+      if (!activeChallengeSession && typeof offerPendingPlayChest === 'function') {
+        await offerPendingPlayChest();
+      }
+    }).catch(function(e) { console.warn('Challenge resume check failed:', e); });
+  });
 }
 
 // ===== 啟動後：背景把所有單字圖片抓進快取（之後離線也能玩、秒開）=====

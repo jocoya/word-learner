@@ -231,15 +231,62 @@ async function startExamPractice() {
   srcEl.appendChild(opt);
 }
 
-function exitGame() {
+async function exitGame() {
   const srcEl = document.getElementById('gameSource');
   if (srcEl) srcEl.parentElement.style.display = '';
   dailyRole = null;
+  if (typeof clearActiveChallenge === 'function') await clearActiveChallenge();
   goTo('page-games');
 }
 
+// 每日遊戲次數（per-child），玩超過 5 次給寶箱（一天一次）。
+// completionId 讓結算重送時保持冪等，不會把同一場算成兩場。
+async function bumpDailyPlayCount(completionId, child) {
+  child = child || ((typeof currentChild !== 'undefined') ? currentChild : 'boy');
+  var today = getTodayStr();
+  var s = await dbGet('settings', 'playCount');
+  if (!s || s.date !== today) s = { key: 'playCount', date: today, boy: 0, girl: 0, chestBoy: false, chestGirl: false, completionIds: [], pendingChests: {} };
+  if (!Array.isArray(s.completionIds)) s.completionIds = [];
+  if (!s.pendingChests) s.pendingChests = {};
+  if (completionId && s.completionIds.indexOf(completionId) !== -1) {
+    var existingPending = s.pendingChests[child];
+    return !!(existingPending && existingPending.id === completionId);
+  }
+  s[child] = (s[child] || 0) + 1;
+  if (completionId) {
+    s.completionIds.push(completionId);
+    if (s.completionIds.length > 80) s.completionIds = s.completionIds.slice(-80);
+  }
+  var gaveChest = false;
+  var chestFlag = child === 'boy' ? 'chestBoy' : 'chestGirl';
+  if (s[child] > 5 && !s[chestFlag]) {   // 「超過 5 次」= 第 6 次起給一次
+    s[chestFlag] = true;
+    s.pendingChests[child] = { id: completionId || ('play-chest-' + Date.now()), child: child };
+    gaveChest = true;
+  }
+  await dbPut('settings', s);
+  return gaveChest;
+}
+
+var _showResultPromise = null;
+var _currentGameRunId = 'run-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+var _finishedGameRunId = null;
 async function showResult(correct, total) {
-  const pct = total > 0 ? correct / total : 0;
+  // 同一場可能因語音 callback、恢復或快速重入而重複結算；共用同一個 Promise。
+  if (_showResultPromise) return _showResultPromise;
+  var pendingSession = (typeof getActiveChallengeSession === 'function') ? getActiveChallengeSession() : null;
+  var resultRunId = pendingSession ? pendingSession.id : _currentGameRunId;
+  if (_finishedGameRunId === resultRunId) return;
+  _finishedGameRunId = resultRunId;
+  _showResultPromise = (async function() {
+    var session = (typeof getActiveChallengeSession === 'function') ? getActiveChallengeSession() : null;
+    var completionId = session ? session.id : ('legacy-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    var rewardChild = session && session.child ? session.child : ((typeof currentChild !== 'undefined') ? currentChild : 'boy');
+    if (session && typeof markActiveChallengeFinishing === 'function') {
+      await markActiveChallengeFinishing(correct, total);
+    }
+
+    const pct = total > 0 ? correct / total : 0;
   const stars = pct >= .9 ? '⭐⭐⭐' : pct >= .7 ? '⭐⭐' : pct >= .5 ? '⭐' : '💪';
   const msgs  = pct >= .9 ? '太厲害了！' : pct >= .7 ? '很棒喔！' : pct >= .5 ? '繼續加油！' : '再練習一下！';
   document.getElementById('resultStars').textContent = stars;
@@ -250,8 +297,12 @@ async function showResult(correct, total) {
   if (devSkip) {
     if (coinArea) coinArea.innerHTML = '<div style="color:#999;">🛠️ 測試模式：不計獎勵</div>';
     goTo('page-result');
+    if (typeof clearActiveChallenge === 'function') await clearActiveChallenge();
     return;
   }
+
+  // 每日玩超過 5 次 → 給一個寶箱（80% 金幣 / 15% 鑽石 / 5% 禮券），男女分開計算、每天一次
+  await bumpDailyPlayCount(completionId, rewardChild);
   if (dailyRole) {
     // 每日挑戰：只要完成挑戰就給 1 金幣，一天一次（不可重複刷，與分數無關）
     const canEarn = await checkDailyCoinLimit(dailyRole);
@@ -268,6 +319,21 @@ async function showResult(correct, total) {
     coinArea.innerHTML = '';
   }
   goTo('page-result');
+
+  if (typeof clearActiveChallenge === 'function') await clearActiveChallenge();
+  // 結算後統一補顯示所有待領的第六場寶箱；若 App 在此之前被回收，啟動時也會補顯示。
+  if (typeof offerPendingPlayChest === 'function') {
+    setTimeout(function() { offerPendingPlayChest(); }, 900);
+  }
+  })();
+  try {
+    return await _showResultPromise;
+  } catch (e) {
+    if (_finishedGameRunId === resultRunId) _finishedGameRunId = null;
+    throw e;
+  } finally {
+    _showResultPromise = null;
+  }
 }
 
 // 連續 5 天都有玩 → 給目前角色鑽石 x1（每次達標只給一次）

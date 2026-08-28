@@ -109,6 +109,8 @@ async function devResetToday() {
   await saveCoins(coins);
   // 認識新朋友橫幅：清今天的次數，讓橫幅再出現
   await dbPut('settings', { key: 'bannerLearn', date: today, count: 0 });
+  // 每日遊戲次數 + 玩超過5次寶箱：清掉讓它能再觸發
+  await dbPut('settings', { key: 'playCount', date: today, boy: 0, girl: 0, chestBoy: false, chestGirl: false, completionIds: [], pendingChests: {} });
   var daily = await getDailyData();
   if (daily.completedDates) {
     daily.completedDates = daily.completedDates.filter(function(d) {

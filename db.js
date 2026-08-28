@@ -128,6 +128,18 @@ async function dbAdd(store, data) {
   return localId;
 }
 
+// 僅更新本機 IndexedDB（不送 Firestore）。
+// 適合 activeSession 這類只屬於目前裝置、而且每題都會更新的暫存狀態。
+async function dbPutLocal(store, data) {
+  var d = await openDB();
+  return new Promise(function(resolve, reject) {
+    var tx = d.transaction(store, 'readwrite');
+    var req = tx.objectStore(store).put(data);
+    req.onsuccess = function() { resolve(req.result); };
+    req.onerror = function() { reject(req.error); };
+  });
+}
+
 // 更新
 async function dbPut(store, data) {
   var d = await openDB();
@@ -218,10 +230,11 @@ async function syncFromFirestore() {
         tx.objectStore('words').put(data);
       }
     });
-    // 同步 settings
+    // activeSession 是目前裝置的暫存場次，不從雲端覆蓋本機狀態。
     var settingsSnap = await firestore.collection('settings').get();
     settingsSnap.forEach(function(doc) {
       var data = doc.data();
+      if (data.key === 'activeSession') return;
       var tx = d.transaction('settings', 'readwrite');
       tx.objectStore('settings').put(data);
     });
@@ -321,10 +334,11 @@ async function getWordsByTag(tag) {
 }
 
 // ===== 初始化：開啟 IndexedDB 後嘗試從 Firestore 同步 =====
-openDB().then(function() {
+// 對外提供本機資料就緒 Promise。activeSession 只存本機且不受雲端覆蓋，
+// 因此不必讓恢復提示等待網路；其他資料仍在背景同步。
+var dbReadyPromise = openDB();
+var dataReadyPromise = dbReadyPromise.then(function() {
   console.log('Local DB ready');
-  // 有網路時從 Firestore 同步
-  if (navigator.onLine) {
-    syncFromFirestore();
-  }
+  if (navigator.onLine) syncFromFirestore();
+  return db;
 });

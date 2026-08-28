@@ -82,7 +82,7 @@ function chunkSentence(sentence, targetWord) {
 }
 
 // 句子排列遊戲（原圖片填空，改為拖拉排列「語塊」卡片）
-function initFillBlankGame(area, words) {
+async function initFillBlankGame(area, words) {
   // 只選有例句的單字（語塊化後對長句也友善，不再硬性限制字數）
   const withSentence = words.filter(w => {
     if (!w.sentences || w.sentences.length === 0) return false;
@@ -92,12 +92,15 @@ function initFillBlankGame(area, words) {
     area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有例句的單字才能玩排列遊戲！</p>';
     return;
   }
-  const total = Math.min(10, withSentence.length);
-  const queue = shuffleArray(withSentence).slice(0, total);
-  let current = 0;
-  let correct = 0;
+  const state = (typeof prepareChallengeQueue === 'function')
+    ? await prepareChallengeQueue('fillblank', withSentence, 5)
+    : { queue: shuffleArray(withSentence).slice(0, Math.min(5, withSentence.length)), current: 0, correct: 0, total: Math.min(5, withSentence.length) };
+  const total = state.total;
+  const queue = state.queue;
+  let current = state.current;
+  let correct = state.correct;
 
-  function renderQuestion() {
+  async function renderQuestion() {
     if (current >= queue.length) {
       showResult(correct, total);
       return;
@@ -113,7 +116,12 @@ function initFillBlankGame(area, words) {
       const pickPool = sorted.slice(0, Math.max(1, Math.ceil(sorted.length / 2)));
       sentence = pickPool[Math.floor(Math.random() * pickPool.length)];
     }
-    if (!sentence) { current++; renderQuestion(); return; }
+    if (!sentence) {
+      current++;
+      if (typeof checkpointGameChallenge === 'function') await checkpointGameChallenge('fillblank', current, correct, total);
+      renderQuestion();
+      return;
+    }
     const img = getRandomImage(target);
     // 把句子切成「語塊」卡片（目標單字會獨立成塊）
     const correctWords = chunkSentence(sentence, target.word);
@@ -143,6 +151,7 @@ function initFillBlankGame(area, words) {
     const slotsEl = document.getElementById('sortSlots');
     const bankEl = document.getElementById('sortBank');
     let placed = [];
+    let answered = false;
 
     // 點擊單字卡片 → 放入排列區
     bankEl.querySelectorAll('.sort-word').forEach(btn => {
@@ -177,7 +186,9 @@ function initFillBlankGame(area, words) {
       renderSlots();
     };
 
-    window.checkSort = () => {
+    window.checkSort = async () => {
+      if (answered) return;
+      answered = true;
       const answer = placed.map(p => p.word).join(' ').toLowerCase();
       const expected = correctWords.join(' ').toLowerCase();
       const isCorrect = answer === expected;
@@ -193,14 +204,20 @@ function initFillBlankGame(area, words) {
         resultEl.style.color = '#f44336';
         speakWord(sentence, 0.7);
       }
-      updateProgress(target.id, isCorrect, 'fillblank', { mistakes: isCorrect ? 0 : 1 });
+      var extra = {
+        mistakes: isCorrect ? 0 : 1,
+        answerId: (typeof makeChallengeAnswerId === 'function') ? makeChallengeAnswerId('fillblank', current, target.id) : null
+      };
+      await updateProgress(target.id, isCorrect, 'fillblank', extra);
       document.getElementById('gameScore').textContent = `${correct} / ${current + 1}`;
       // 禁用操作
       document.getElementById('sortCheckBtn').disabled = true;
       document.getElementById('sortClearBtn').disabled = true;
       bankEl.querySelectorAll('.sort-word').forEach(b => b.style.pointerEvents = 'none');
       slotsEl.querySelectorAll('.sort-placed').forEach(b => b.style.pointerEvents = 'none');
-      setTimeout(() => { current++; renderQuestion(); }, 2500);
+      current++;
+      if (typeof checkpointGameChallenge === 'function') await checkpointGameChallenge('fillblank', current, correct, total);
+      setTimeout(renderQuestion, 2500);
     };
   }
 

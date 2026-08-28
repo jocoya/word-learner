@@ -280,6 +280,20 @@ async function recordGameResult(payload) {
   if (!p) p = fsrsInitProgress(progressId(payload.wordId));
   else p = fsrsUpgrade(p);
 
+  // App 可能在「FSRS 已寫入、場次游標尚未 checkpoint」之間被系統回收。
+  // 固定 answerId 讓恢復後重送同一題時保持冪等，不會再次增加熟練度。
+  if (payload.answerId && p.lastAnswerId === payload.answerId) {
+    return {
+      rating: rating,
+      isFirstToday: false,
+      isEasy: rating === 4,
+      stageUnlocked: null,
+      stability: p.stability,
+      state: p.state,
+      duplicate: true
+    };
+  }
+
   var prevS = p.stability || 0;
   var todayStr = (function() {
     var d = new Date();
@@ -293,6 +307,7 @@ async function recordGameResult(payload) {
   newP.reviewDays = (p.reviewDays || 0) + (isFirstToday ? 1 : 0);
   newP.todayReviewed = todayStr;
   newP.wordId = progressId(payload.wordId); // 確保 key 是本小孩專屬
+  if (payload.answerId) newP.lastAnswerId = payload.answerId;
 
   // 檢查階段升級：stability + 複習次數(reps) + 不同天數(reviewDays) 三條件都要達標
   // 這樣「同一天狂答對」不會直接升級，必須跨天、真的練夠才升 → 符合「會應用」的定義
