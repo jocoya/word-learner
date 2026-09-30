@@ -1,11 +1,21 @@
 // 泡泡戳戳樂遊戲（物理彈跳 + 粒子爆裂版）
 // maxRounds: 可選，限制題數（每日挑戰用，例如只玩 3 題）；不傳則最多 8 題
-function initBubbleGame(area, words, maxRounds) {
-  var isKid = currentMode === 'kid';
-  var isBaby = currentMode === 'baby';
+// modeOverride: 可選，'baby' | 'kid'；每日挑戰萌新用 'baby'（不管目前全域模式）
+function initBubbleGame(area, words, maxRounds, modeOverride) {
+  var mode = modeOverride || currentMode;
+  var isKid = mode === 'kid';
+  var isBaby = mode === 'baby';
   var limit = (typeof maxRounds === 'number' && maxRounds > 0) ? maxRounds : 8;
-  var total = Math.min(limit, words.length);
-  var queue = shuffleArray(words).slice(0, total);
+  // 小寶貝：只用「有圖片」的字出題與當干擾泡泡；沒圖片的字不出題
+  var pool = isBaby ? words.filter(function(w) { return getAllImages(w).length > 0; }) : words;
+  if (isBaby && pool.length < 4) {
+    area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有圖片的單字才能玩泡泡！</p>';
+    // 每日挑戰中要讓流程繼續（一般遊戲就停在提示畫面，不算完成一場）
+    if (window.dailySegmentActive) setTimeout(function() { showResult(0, 0); }, 1500);
+    return;
+  }
+  var total = Math.min(limit, pool.length);
+  var queue = shuffleArray(pool).slice(0, total);
   var current = 0, correct = 0, animId = null, roundStart = 0;
 
   function confettiBurst(x, y, fieldEl) {
@@ -37,13 +47,17 @@ function initBubbleGame(area, words, maxRounds) {
     if (animId) { cancelAnimationFrame(animId); animId = null; }
     if (current >= queue.length) { showResult(correct, total); return; }
     var target = queue[current];
-    var others = shuffleArray(words.filter(function(w){return w.id!==target.id;})).slice(0,3);
+    // 小寶貝：干擾泡泡也只能用有圖片的字（全部泡泡都是圖，不出現英文）
+    var otherPool = (isBaby ? pool : words).filter(function(w){return w.id!==target.id;});
+    var others = shuffleArray(otherPool).slice(0,3);
     var allOptions = shuffleArray([target].concat(others));
 
     area.innerHTML =
       '<div class="bubble-container">' +
         '<div class="bubble-prompt">' +
-          '<span class="bubble-hint">' + esc(target.word) + '</span>' +
+          // 小寶貝：不顯示英文答案，只用聽的（不然會變成比對字母，而不是聽音找圖）
+          (isBaby ? '<span class="bubble-hint bubble-hint-baby">👂 聽聽看，戳哪一個？</span>'
+                  : '<span class="bubble-hint">' + esc(target.word) + '</span>') +
           '<button class="bubble-speak" onclick="speakWord(\'' + esc(target.word) + '\',0.7)">🔊</button>' +
           '<div class="bubble-timer" id="bubbleTimer"' + (isKid ? '' : ' hidden') + '></div>' +
           '<span style="color:#999;font-size:.9em;margin-left:auto;">' + (current+1) + '/' + total + '</span>' +
@@ -72,10 +86,13 @@ function initBubbleGame(area, words, maxRounds) {
       var el = document.createElement('div');
       el.className = 'bubble-phys';
       var img = getRandomImage(b.word);
+      // 圖片載入失敗時：小寶貝顯示中文（家長看得懂、孩子不會看到英文拼字），挑戰顯示英文
+      var fallback = isBaby ? esc(b.word.meaning || '❓') : esc(b.word.word);
       if (img) {
-        el.innerHTML = '<img src="' + img + '" alt="" onerror="this.outerHTML=\'<span>' + esc(b.word.word) + '</span>\'">';
+        el.innerHTML = '<img src="' + img + '" alt="">';
+        el.querySelector('img').onerror = function() { el.innerHTML = '<span>' + fallback + '</span>'; };
       } else {
-        el.innerHTML = '<span>' + esc(b.word.word) + '</span>';
+        el.innerHTML = '<span>' + fallback + '</span>';
       }
       el.style.left = (b.x-R)+'px'; el.style.top = (b.y-R)+'px';
       el.addEventListener('click', function(){ handleTap(i, target); });

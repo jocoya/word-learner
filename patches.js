@@ -296,11 +296,16 @@ async function planDailyChallenge(role) {
   // 各等級對應的關卡流程：[{ gameType, count, minS }]
   // count = 0 表示「一局多字」
   if (level === 'beginner') {
-    return [
-      { gameType: 'listen',   count: 3, minS: 0 },
-      { gameType: 'memory',   count: 0, minS: 0, memMode: 'baby' }, // 萌新翻牌：圖配圖（小寶貝風格）
-      { gameType: 'bubble',   count: 0, minS: 0, rounds: 3 } // 泡泡：限 3 題
+    // 萌新 = 小寶貝模式的簡易版：從「只看圖、聽音」的遊戲中隨機挑 3 種，每種都用小寶貝版本
+    // 看字選圖（聽英文→點圖）、翻牌（圖配圖）、泡泡（聽英文→戳圖）、探照燈（找圖）
+    // 都是一局多字（count:0），並限 3 題；翻牌是一整局無法限題
+    var BABY_POOL = [
+      { gameType: 'listen',     count: 0, minS: 0, rounds: 3, memMode: 'baby' },
+      { gameType: 'memory',     count: 0, minS: 0, memMode: 'baby' },
+      { gameType: 'bubble',     count: 0, minS: 0, rounds: 3, memMode: 'baby' },
+      { gameType: 'flashlight', count: 0, minS: 0, rounds: 3, memMode: 'baby' }
     ];
+    return shuffleArray(BABY_POOL).slice(0, 3);
   }
   if (level === 'intermediate') {
     return [
@@ -371,6 +376,10 @@ startDailyWithRole = async function(role) {
         return w.sentences && w.sentences.some(function(s) { return s && s.trim().split(/\s+/).length >= 2; });
       });
     }
+    // 小寶貝版遊戲只能用有圖片的字（選項、泡泡、翻牌全是圖）；沒圖片的字不出題
+    if (seg.memMode === 'baby') {
+      picked = picked.filter(function(w) { return getAllImages(w).length > 0; });
+    }
     if (seg.count === 0) {
       if (picked.length >= 4) segments.push({ gameType: seg.gameType, wordIds: picked.map(function(w) { return w.id; }), multi: true, rounds: seg.rounds || 0, memMode: seg.memMode || null });
     } else if (picked.length >= 1) {
@@ -384,9 +393,11 @@ startDailyWithRole = async function(role) {
   }
 
   var totalQuestions = segments.reduce(function(sum, s) { return sum + (s.multi ? 1 : s.wordIds.length); }, 0);
+  // 萌新（全部都是小寶貝版遊戲）→ 整場用 baby 模式（FSRS 也用小寶貝評分，最高 Good）
+  var dailyMode = segments.every(function(s) { return s.memMode === 'baby'; }) ? 'baby' : 'kid';
   var session = {
     id: newChallengeId(), status: 'active', kind: 'daily', gameId: 'daily',
-    mode: 'kid', child: role, source: 'permanent',
+    mode: dailyMode, child: role, source: 'permanent',
     dueWordIds: dueWords.map(function(w) { return w.id; }), segments: segments,
     segmentIndex: 0, questionIndex: 0, doneQuestions: 0,
     correct: 0, total: totalQuestions
@@ -399,7 +410,7 @@ async function runDailyChallengeSession(session) {
   activeChallengeSession = session;
   dailyRole = session.child;
   currentChild = session.child;
-  currentMode = 'kid';
+  currentMode = session.mode === 'baby' ? 'baby' : 'kid';
   if (typeof updateChildSwitchUI === 'function') updateChildSwitchUI();
 
   var dueWords = await loadWordsByIds(session.dueWordIds || []);
@@ -547,19 +558,24 @@ function renderMixMemorySingle(area, target, others, cb) {
 // 一局多字區段：劫持 showResult 收結算（bubble / memory 等整局遊戲共用）
 // rounds: 可選，限制題數（bubble 用）
 // memModeOverride: 可選，覆蓋 memory 顯示模式（'baby'=圖配圖 / 'kid'=字配圖）
-function runFullGameSegment(area, gameType, words, doneCb, rounds, memModeOverride) {
+// modeOverride: 可選，覆蓋遊戲模式（'baby'=小寶貝版 / 'kid'=挑戰版）；萌新一律 'baby'
+function runFullGameSegment(area, gameType, words, doneCb, rounds, modeOverride) {
   var origShowResult = showResult;
+  // 讓遊戲知道自己在每日挑戰中：題目不足時要交回結算，不能卡住
+  window.dailySegmentActive = true;
   showResult = function(correctCount, totalCount) {
     showResult = origShowResult; // 立刻還原
+    window.dailySegmentActive = false;
     if (doneCb) doneCb(correctCount, totalCount);
   };
   var shuffled = shuffleArray(words);
-  var defMode = (typeof currentMode !== 'undefined' ? currentMode : 'kid');
+  var mode = modeOverride || (typeof currentMode !== 'undefined' ? currentMode : 'kid');
   switch (gameType) {
-    case 'bubble': initBubbleGame(area, shuffled, rounds || 0); break;
-    case 'memory': initMemoryGame(area, shuffled, memModeOverride || defMode); break;
-    case 'listen': initListenGame(area, shuffled, defMode); break;
-    default:       initBubbleGame(area, shuffled, rounds || 0);
+    case 'bubble':     initBubbleGame(area, shuffled, rounds || 0, mode); break;
+    case 'memory':     initMemoryGame(area, shuffled, mode); break;
+    case 'listen':     initListenGame(area, shuffled, mode, rounds || 0); break;
+    case 'flashlight': initFlashlightGame(area, shuffled, rounds || 0); break;
+    default:           initBubbleGame(area, shuffled, rounds || 0, mode);
   }
 }
 
@@ -664,22 +680,47 @@ startGame = async function(gameId) {
       case 'match':     initMatchGame(area, words); break;
       case 'cloze':     initClozeGame(area, words); break;
       case 'write':     initWriteGame(area, words); break;
-      case 'hunt':      initHuntGame(area, words); break;
+      case 'hunt':      initHuntGame(area, words, 'hunt'); break;
+      case 'mimic':     initHuntGame(area, words, 'mimic'); break;
+      case 'color':     initHuntGame(area, words, 'color'); break;
       case 'phonics':   initPhonicsGame(area, words, currentMode); break;
       case 'pattern':   initPatternGame(area, words); break;
     }
   });
 };
 
-// 首頁大卡片：直接開始家中尋寶（用永久庫單字）
-async function startHomeHunt() {
+// 首頁大卡片：選擇三種生活任務（家中尋寶 / 動作模仿 / 顏色尋寶），用永久庫單字
+async function startHomeHunt(kind) {
+  if (!kind) { openHuntPicker(); return; }
+  var picker = document.getElementById('modal-hunt-pick');
+  if (picker) picker.hidden = true;
   currentMode = 'kid';
   dailyRole = null;
   var src = document.getElementById('gameSource');
   if (src) src.value = 'permanent';
   var tag = document.getElementById('gameTagFilter');
   if (tag) tag.value = 'all';
-  await startGame('hunt');
+  await startGame(kind);
+}
+
+// 選擇視窗：每種顯示「還有幾個新任務」，全部找過就提示是複習
+async function openHuntPicker() {
+  var modal = document.getElementById('modal-hunt-pick');
+  if (!modal) return;
+  var words = await dbGetByIndex('words', 'pool', 'permanent');
+  var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+  ['hunt', 'mimic', 'color'].forEach(function(kind) {
+    var mine = words.filter(function(w) { return huntTaskType(w) === kind; });
+    var fresh = mine.filter(function(w) { return !huntFoundAt(w, child); }).length;
+    var el = document.getElementById('huntPickInfo-' + kind);
+    if (!el) return;
+    if (!mine.length) el.textContent = '還沒有這類單字';
+    else if (fresh) el.textContent = '還有 ' + fresh + ' 個新任務';
+    else el.textContent = '全部找過了，來複習';
+    var btn = document.getElementById('huntPickBtn-' + kind);
+    if (btn) btn.disabled = !mine.length;
+  });
+  modal.hidden = false;
 }
 
 // ===== FSRS 整合的多巴胺系統 =====

@@ -1,11 +1,15 @@
 // 探照燈尋寶遊戲
-function initFlashlightGame(area, words) {
+// maxRounds: 可選，限制題數（每日挑戰萌新用）
+function initFlashlightGame(area, words, maxRounds) {
   var withImg = words.filter(function(w) { return getAllImages(w).length > 0; });
   if (withImg.length < 4) {
     area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有圖片的單字才能玩探照燈！</p>';
+    // 每日挑戰中不能卡住：交回結算讓流程繼續（一般遊戲就停在提示畫面，不算完成一場）
+    if (window.dailySegmentActive) setTimeout(function() { showResult(0, 0); }, 1500);
     return;
   }
-  var total = Math.min(8, withImg.length);
+  var limit = (typeof maxRounds === 'number' && maxRounds > 0) ? maxRounds : 8;
+  var total = Math.min(limit, withImg.length);
   var queue = shuffleArray(withImg).slice(0, total);
   var current = 0, correct = 0;
 

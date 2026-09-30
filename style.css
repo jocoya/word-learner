@@ -2195,12 +2195,35 @@ body {
 .hunt-skip { color: #888; }
 .hunt-saved { font-size: .7em; color: #00838F; margin-top: 6px; }
 .hunt-memory { font-size: .7em; color: #666; margin-top: 10px; }
+.hunt-memory-top { font-size: 1em; margin-top: 0; }
+.hunt-intro { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 40px 20px; background: #fff; border-radius: 24px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.hunt-intro-icon { font-size: 5em; line-height: 1; }
+.hunt-intro-title { font-size: 2em; font-weight: 800; color: #00838F; }
+.hunt-intro-msg { font-size: 1.3em; color: #444; line-height: 1.6; }
+.hunt-intro-count { color: #999; }
+.hunt-new-tag, .hunt-review-tag { font-size: .75em; padding: 2px 10px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+.hunt-new-tag { background: #FFF3E0; color: #E65100; }
+.hunt-review-tag { background: #E3F2FD; color: #1565C0; }
+.hunt-swatch { width: 96px; height: 96px; border-radius: 50%; margin: 8px auto; border: 4px solid #fff; box-shadow: 0 0 0 3px #ccc, 0 4px 12px rgba(0,0,0,.15); }
+/* 動作模仿：橘色系 */
+.hunt-mimic .hunt-word, .hunt-mimic .hunt-progress, .hunt-mimic .hunt-intro-title { color: #E65100; }
+.hunt-mimic .hunt-camera { background: linear-gradient(135deg, #FB8C00, #E65100); border: none; box-shadow: 0 4px 12px rgba(230,81,0,.35); }
+/* 顏色尋寶：紫色系 */
+.hunt-color .hunt-word, .hunt-color .hunt-progress, .hunt-color .hunt-intro-title { color: #6A1B9A; }
+.hunt-color .hunt-camera { background: linear-gradient(135deg, #8E24AA, #6A1B9A); box-shadow: 0 4px 12px rgba(106,27,154,.35); }
+/* 生活任務選擇視窗 */
+.hunt-pick { max-width: 520px; display: flex; flex-direction: column; gap: 12px; }
+.hunt-pick-btn { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 18px; border: 3px solid; background: #fff; cursor: pointer; text-align: left; }
+.hunt-pick-btn:disabled { opacity: .45; cursor: not-allowed; }
+.hunt-pick-hunt { border-color: #4DD0E1; }
+.hunt-pick-mimic { border-color: #FFB74D; }
+.hunt-pick-color { border-color: #BA68C8; }
+.hunt-pick-icon { font-size: 2.6em; }
+.hunt-pick-text { display: flex; flex-direction: column; gap: 2px; font-size: 1.15em; }
+.hunt-pick-text small { font-size: .8em; color: #777; }
+.hunt-pick-info { color: #E65100 !important; font-weight: 600; }
 .hunt-memory img { display: block; margin: 6px auto 0; max-width: 200px; max-height: 200px; border-radius: 14px; border: 3px solid #4DD0E1; object-fit: cover; }
-/* 動作任務：橘色系；顏色/特徵任務：紫色系 */
-.hunt-act .hunt-word, .hunt-act .hunt-progress { color: #E65100; }
-.hunt-act .hunt-camera { background: linear-gradient(135deg, #FB8C00, #E65100); border: none; box-shadow: 0 4px 12px rgba(230,81,0,.35); }
-.hunt-look .hunt-word, .hunt-look .hunt-progress { color: #6A1B9A; }
-.hunt-look .hunt-camera { background: linear-gradient(135deg, #8E24AA, #6A1B9A); box-shadow: 0 4px 12px rgba(106,27,154,.35); }
+
 
 
 /* ===== 學習地圖（Atlas）===== */

@@ -74,6 +74,8 @@ const GAMES = [
   { id: 'echo',      icon: '�', name: '魔法動物園',  desc: '唸對單字叫醒恐龍',   modes: ['baby','kid'] },
   { id: 'flashlight',icon: '🔦', name: '探照燈尋寶',  desc: '用手電筒找出圖片',   modes: ['baby'] },
   { id: 'hunt',      icon: '🏠', name: '家中尋寶',   desc: '聽單字、在家找到它拍下來', modes: ['baby','kid'] },
+  { id: 'mimic',     icon: '🤸', name: '動作模仿',   desc: '聽單字、做出這個動作',     modes: ['baby','kid'] },
+  { id: 'color',     icon: '🎨', name: '顏色尋寶',   desc: '找到這個顏色或特徵的東西', modes: ['baby','kid'] },
   { id: 'phonics',   icon: '🔤', name: '拼讀小達人', desc: '聽音找字母、看字自己念',   modes: ['baby','kid'] },
   { id: 'fillblank', icon: '📝', name: '句子排列',   desc: '把單字排成正確句子',  modes: ['kid'] },
   { id: 'spelling',  icon: '🔤', name: '拼字挑戰',   desc: '拼出正確的單字',     modes: ['kid'] },

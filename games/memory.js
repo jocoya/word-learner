@@ -36,7 +36,8 @@ function playMissSound() {
 }
 
 function initMemoryGame(area, words, mode) {
-  const count = Math.min(6, words.length);
+  // count = 實際配對組數（小寶貝版會在下面改成「有圖片的字」數量）
+  let count = Math.min(6, words.length);
   const selected = words.slice(0, count);
   let cards = [];
 
@@ -45,10 +46,13 @@ function initMemoryGame(area, words, mode) {
     const withImg = words.filter(w => getAllImages(w).length > 0);
     if (withImg.length < 4) {
       area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有圖片的單字才能玩翻牌！</p>';
+      // 每日挑戰中要讓流程繼續（一般遊戲就停在提示畫面）
+      if (window.dailySegmentActive) setTimeout(function() { showResult(0, 0); }, 1500);
       return;
     }
     const useWords = shuffleArray(withImg).slice(0, Math.min(6, withImg.length));
     const cnt = useWords.length;
+    count = cnt; // 結束條件要用實際組數，否則 matched 永遠追不上
     useWords.forEach((w, i) => {
       const img = getRandomImage(w);
       const label = `<img src="${img}" alt="" style="max-width:90%;max-height:70%;object-fit:contain;border-radius:6px;" />`;

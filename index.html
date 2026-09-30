@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>英文單字學習樂園</title>
-  <link rel="stylesheet" href="style.css?v=66" />
+  <link rel="stylesheet" href="style.css?v=67" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#4A90D9" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -42,9 +42,9 @@
           <div class="profile-desc">家長陪讀 · 5 個新單字</div>
         </button>
         <button class="profile-card hunt" onclick="startHomeHunt()">
-          <div class="profile-icon" style="font-size:48px;line-height:56px;">🏠</div>
-          <div class="profile-name">家中尋寶</div>
-          <div class="profile-desc">聽單字 · 找到它拍下來</div>
+          <div class="profile-icon" style="font-size:48px;line-height:56px;">🏡</div>
+          <div class="profile-name">生活任務</div>
+          <div class="profile-desc">尋寶 · 模仿 · 顏色</div>
         </button>
       </div>
       <button class="btn-manage" onclick="goTo('page-manage')">⚙️ 管理單字</button>
@@ -58,7 +58,7 @@
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v66</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v67</div>
   </div>
 
   <!-- 故事專區 -->
@@ -430,13 +430,13 @@
         <label class="daily-level-label">程度</label>
         <select id="dailyLevelBoy" onchange="saveDailyLevel('boy', this.value)">
           <option value="auto">👦 自動（依平均熟悉度）</option>
-          <option value="beginner">👦 萌新（聽選圖+翻牌+泡泡）</option>
+          <option value="beginner">👦 萌新（小寶貝遊戲隨機 3 種，只看圖聽音）</option>
           <option value="intermediate">👦 中級（加句子排列）</option>
           <option value="advanced">👦 高級（加拼字）</option>
         </select>
         <select id="dailyLevelGirl" onchange="saveDailyLevel('girl', this.value)">
           <option value="auto">👧 自動（依平均熟悉度）</option>
-          <option value="beginner">👧 萌新</option>
+          <option value="beginner">👧 萌新（小寶貝遊戲）</option>
           <option value="intermediate">👧 中級</option>
           <option value="advanced">👧 高級</option>
         </select>
@@ -490,6 +490,26 @@
         <button class="report-tab" id="reportTabGirl" onclick="renderReport('girl')">👧 小女生</button>
       </div>
       <div id="reportBody"></div>
+    </div>
+  </div>
+
+  <!-- 生活任務：三選一 -->
+  <div id="modal-hunt-pick" class="modal" hidden>
+    <div class="modal-content hunt-pick">
+      <h3 style="margin:0;">🏡 今天要玩哪一個？</h3>
+      <button class="hunt-pick-btn hunt-pick-hunt" id="huntPickBtn-hunt" onclick="startHomeHunt('hunt')">
+        <span class="hunt-pick-icon">🏠</span>
+        <span class="hunt-pick-text"><b>家中尋寶</b><small>聽單字，找到東西拍下來</small><small class="hunt-pick-info" id="huntPickInfo-hunt"></small></span>
+      </button>
+      <button class="hunt-pick-btn hunt-pick-mimic" id="huntPickBtn-mimic" onclick="startHomeHunt('mimic')">
+        <span class="hunt-pick-icon">🤸</span>
+        <span class="hunt-pick-text"><b>動作模仿</b><small>聽單字，做出這個動作</small><small class="hunt-pick-info" id="huntPickInfo-mimic"></small></span>
+      </button>
+      <button class="hunt-pick-btn hunt-pick-color" id="huntPickBtn-color" onclick="startHomeHunt('color')">
+        <span class="hunt-pick-icon">🎨</span>
+        <span class="hunt-pick-text"><b>顏色尋寶</b><small>找到這個顏色或特徵的東西</small><small class="hunt-pick-info" id="huntPickInfo-color"></small></span>
+      </button>
+      <button class="btn-ghost" onclick="hideModal('modal-hunt-pick')">關閉</button>
     </div>
   </div>
 
@@ -562,38 +582,38 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="db.js?v=66"></script>
-  <script src="fsrs-engine.js?v=66"></script>
-  <script src="ai.js?v=66"></script>
-  <script src="imagegen.js?v=66"></script>
-  <script src="games/memory.js?v=66"></script>
-  <script src="games/listen.js?v=66"></script>
-  <script src="games/fillblank.js?v=66"></script>
-  <script src="games/spelling.js?v=66"></script>
-  <script src="games/speak.js?v=66"></script>
-  <script src="games/bubble.js?v=66"></script>
-  <script src="games/echo.js?v=66"></script>
-  <script src="games/flashlight.js?v=66"></script>
-  <script src="games/detective.js?v=66"></script>
-  <script src="games/match.js?v=66"></script>
-  <script src="games/cloze.js?v=66"></script>
-  <script src="games/learn.js?v=66"></script>
-  <script src="games/atlas.js?v=66"></script>
-  <script src="games/write.js?v=66"></script>
-  <script src="games/hunt.js?v=66"></script>
-  <script src="games/phonics.js?v=66"></script>
-  <script src="games/pattern.js?v=66"></script>
-  <script src="data/moe-wordlist.js?v=66"></script>
-  <script src="curriculum.js?v=66"></script>
-  <script src="app.js?v=66"></script>
-  <script src="coins.js?v=66"></script>
-  <script src="dev.js?v=66"></script>
-  <script src="cloud.js?v=66"></script>
-  <script src="patches.js?v=66"></script>
-  <script src="stories.js?v=66"></script>
-  <script src="monster.js?v=66"></script>
+  <script src="db.js?v=67"></script>
+  <script src="fsrs-engine.js?v=67"></script>
+  <script src="ai.js?v=67"></script>
+  <script src="imagegen.js?v=67"></script>
+  <script src="games/memory.js?v=67"></script>
+  <script src="games/listen.js?v=67"></script>
+  <script src="games/fillblank.js?v=67"></script>
+  <script src="games/spelling.js?v=67"></script>
+  <script src="games/speak.js?v=67"></script>
+  <script src="games/bubble.js?v=67"></script>
+  <script src="games/echo.js?v=67"></script>
+  <script src="games/flashlight.js?v=67"></script>
+  <script src="games/detective.js?v=67"></script>
+  <script src="games/match.js?v=67"></script>
+  <script src="games/cloze.js?v=67"></script>
+  <script src="games/learn.js?v=67"></script>
+  <script src="games/atlas.js?v=67"></script>
+  <script src="games/write.js?v=67"></script>
+  <script src="games/hunt.js?v=67"></script>
+  <script src="games/phonics.js?v=67"></script>
+  <script src="games/pattern.js?v=67"></script>
+  <script src="data/moe-wordlist.js?v=67"></script>
+  <script src="curriculum.js?v=67"></script>
+  <script src="app.js?v=67"></script>
+  <script src="coins.js?v=67"></script>
+  <script src="dev.js?v=67"></script>
+  <script src="cloud.js?v=67"></script>
+  <script src="patches.js?v=67"></script>
+  <script src="stories.js?v=67"></script>
+  <script src="monster.js?v=67"></script>
   <script>
-    var APP_VERSION = 'v66';
+    var APP_VERSION = 'v67';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號

@@ -1,13 +1,23 @@
 // 看字選圖（小寶貝）/ 看圖選字（挑戰）
-function initListenGame(area, words, mode) {
-  const total = Math.min(10, words.length);
-  const queue = shuffleArray(words).slice(0, total);
+// maxRounds: 可選，限制題數（每日挑戰萌新用）
+function initListenGame(area, words, mode, maxRounds) {
+  // 小寶貝：看字選圖的選項全部是圖片，沒圖片的字不出題、也不當干擾選項
+  const pool = mode === 'baby' ? words.filter(w => getAllImages(w).length > 0) : words;
+  if (mode === 'baby' && pool.length < 4) {
+    area.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">需要至少 4 個有圖片的單字才能玩看字選圖！</p>';
+    // 每日挑戰中要讓流程繼續（一般遊戲就停在提示畫面，不算完成一場）
+    if (window.dailySegmentActive) setTimeout(function() { showResult(0, 0); }, 1500);
+    return;
+  }
+  const limit = (typeof maxRounds === 'number' && maxRounds > 0) ? maxRounds : 10;
+  const total = Math.min(limit, pool.length);
+  const queue = shuffleArray(pool).slice(0, total);
   let current = 0, correct = 0;
 
   function renderQuestion() {
     if (current >= queue.length) { showResult(correct, total); return; }
     const target = queue[current];
-    const others = shuffleArray(words.filter(w => w.id !== target.id)).slice(0, 3);
+    const others = shuffleArray(pool.filter(w => w.id !== target.id)).slice(0, 3);
     const options = shuffleArray([target, ...others]);
 
     if (mode === 'baby') {

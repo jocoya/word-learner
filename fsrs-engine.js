@@ -203,7 +203,8 @@ function gameToRating(payload) {
 
   // 家中尋寶（hunt）：聽到英文就找到真實物品 → Good(3)；看了中文/圖片提示才找到 → Hard(2)
   // 「家裡沒有」不會呼叫這裡，不扣分
-  if (gt === 'hunt') {
+  // 動作模仿（mimic）、顏色尋寶（color）同樣是「把英文連到真實世界」，評分與尋寶相同
+  if (gt === 'hunt' || gt === 'mimic' || gt === 'color') {
     return hint > 0 ? 2 : 3;
   }
 
@@ -418,7 +419,12 @@ var GAME_NAMES_ZH = {
   fillblank: '句子排列',
   detective: '線索偵探',
   match: '連連看',
-  cloze: '讀句選字'
+  cloze: '讀句選字',
+  hunt: '家中尋寶',
+  mimic: '動作模仿',
+  color: '顏色尋寶',
+  phonics: '拼讀小達人',
+  pattern: '仿造句子'
 };
 
 // 取得單字的當前 stability（沒有 progress 紀錄就回 0）— 依目前小孩
