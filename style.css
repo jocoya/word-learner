@@ -1558,7 +1558,14 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   display: none;
 }
-.dev-panel { max-width: 420px; }
+/* 開發者工具內容可能比螢幕高：限制高度並可上下滑動 */
+.dev-panel {
+  max-width: 420px;
+  max-height: 90vh; max-height: 90dvh;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.dev-panel > * { flex-shrink: 0; }
 .dev-status { margin: 8px 0; font-size: 0.95em; }
 .dev-btns { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .dev-btn {
