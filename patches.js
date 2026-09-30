@@ -83,7 +83,7 @@ async function getGameWords(gameType) {
 var activeChallengeSession = null;
 var _resumeWordsOverride = null;
 var _resumingActiveChallenge = false;
-var RESUMABLE_GAMES = { fillblank: true, speak: true, detective: true };
+var RESUMABLE_GAMES = { fillblank: true, speak: true, detective: true, pattern: true };
 
 function newChallengeId() {
   return 'challenge-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
@@ -665,6 +665,8 @@ startGame = async function(gameId) {
       case 'cloze':     initClozeGame(area, words); break;
       case 'write':     initWriteGame(area, words); break;
       case 'hunt':      initHuntGame(area, words); break;
+      case 'phonics':   initPhonicsGame(area, words, currentMode); break;
+      case 'pattern':   initPatternGame(area, words); break;
     }
   });
 };
@@ -900,6 +902,11 @@ async function renderReport(child) {
       '</div>';
   } else if (learned > 0) {
     html += '<p style="text-align:center;color:#4CAF50;padding:16px;">太棒了！目前沒有特別困難的單字 🎉</p>';
+  }
+
+  // 課綱字表進度（教育部 1200 / 2000）
+  if (typeof renderMoeProgressHtml === 'function') {
+    try { html += await renderMoeProgressHtml(child); } catch (e) { console.warn('課綱進度失敗', e); }
   }
 
   if (body) body.innerHTML = html;

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>英文單字學習樂園</title>
-  <link rel="stylesheet" href="style.css?v=65" />
+  <link rel="stylesheet" href="style.css?v=66" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#4A90D9" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -58,7 +58,7 @@
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v65</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v66</div>
   </div>
 
   <!-- 故事專區 -->
@@ -76,7 +76,7 @@
           <span class="story-big-icon">📖</span>
           <span>今天的故事</span>
         </button>
-        <p class="story-hint">自動用今天學過、該複習的單字寫一個 5 頁小故事（需要電腦上的 AI 開著，約十幾秒）。</p>
+        <p class="story-hint">用孩子已經會的字寫一個 5 頁小故事，只放 1–2 個正在學的新字，讀完有 2 題小問題（需要電腦上的 AI 開著，約十幾秒）。</p>
         <div class="story-progress" id="storyProgress" role="status" aria-live="polite"></div>
       </section>
       <section class="story-panel">
@@ -92,6 +92,7 @@
       <button class="back-btn" onclick="closeStoryReader()">← 返回</button>
       <h2 id="storyReaderTitle">故事</h2>
     </div>
+    <div class="story-quiz" id="storyQuiz" hidden></div>
     <div class="story-reader">
       <div class="story-reader-img-wrap">
         <button class="story-reader-pic" id="storyReaderPic" onclick="storyTapPicture()" aria-label="點圖片"></button>
@@ -244,9 +245,13 @@
           <button class="btn-sm" onclick="batchFillPos()">🔤 批次判斷詞性</button>
           <button class="btn-sm" onclick="batchClassifyTags()">🏷️ 批次主題分類</button>
           <button class="btn-sm" onclick="openBulkImport()">📥 整批匯入單字</button>
+          <button class="btn-sm" onclick="openMoeImport()">📘 從教育部字表加入</button>
         </div>
         <div class="batch-progress" id="batchProgress"></div>
       </div>
+
+      <!-- 教育部字表匯入（內嵌） -->
+      <div id="moeImportBox" class="bulk-import-box" hidden></div>
 
       <!-- 整批匯入對話框（內嵌） -->
       <div id="bulkImportBox" class="bulk-import-box" hidden>
@@ -557,34 +562,38 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="db.js?v=65"></script>
-  <script src="fsrs-engine.js?v=65"></script>
-  <script src="ai.js?v=65"></script>
-  <script src="imagegen.js?v=65"></script>
-  <script src="games/memory.js?v=65"></script>
-  <script src="games/listen.js?v=65"></script>
-  <script src="games/fillblank.js?v=65"></script>
-  <script src="games/spelling.js?v=65"></script>
-  <script src="games/speak.js?v=65"></script>
-  <script src="games/bubble.js?v=65"></script>
-  <script src="games/echo.js?v=65"></script>
-  <script src="games/flashlight.js?v=65"></script>
-  <script src="games/detective.js?v=65"></script>
-  <script src="games/match.js?v=65"></script>
-  <script src="games/cloze.js?v=65"></script>
-  <script src="games/learn.js?v=65"></script>
-  <script src="games/atlas.js?v=65"></script>
-  <script src="games/write.js?v=65"></script>
-  <script src="games/hunt.js?v=65"></script>
-  <script src="app.js?v=65"></script>
-  <script src="coins.js?v=65"></script>
-  <script src="dev.js?v=65"></script>
-  <script src="cloud.js?v=65"></script>
-  <script src="patches.js?v=65"></script>
-  <script src="stories.js?v=65"></script>
-  <script src="monster.js?v=65"></script>
+  <script src="db.js?v=66"></script>
+  <script src="fsrs-engine.js?v=66"></script>
+  <script src="ai.js?v=66"></script>
+  <script src="imagegen.js?v=66"></script>
+  <script src="games/memory.js?v=66"></script>
+  <script src="games/listen.js?v=66"></script>
+  <script src="games/fillblank.js?v=66"></script>
+  <script src="games/spelling.js?v=66"></script>
+  <script src="games/speak.js?v=66"></script>
+  <script src="games/bubble.js?v=66"></script>
+  <script src="games/echo.js?v=66"></script>
+  <script src="games/flashlight.js?v=66"></script>
+  <script src="games/detective.js?v=66"></script>
+  <script src="games/match.js?v=66"></script>
+  <script src="games/cloze.js?v=66"></script>
+  <script src="games/learn.js?v=66"></script>
+  <script src="games/atlas.js?v=66"></script>
+  <script src="games/write.js?v=66"></script>
+  <script src="games/hunt.js?v=66"></script>
+  <script src="games/phonics.js?v=66"></script>
+  <script src="games/pattern.js?v=66"></script>
+  <script src="data/moe-wordlist.js?v=66"></script>
+  <script src="curriculum.js?v=66"></script>
+  <script src="app.js?v=66"></script>
+  <script src="coins.js?v=66"></script>
+  <script src="dev.js?v=66"></script>
+  <script src="cloud.js?v=66"></script>
+  <script src="patches.js?v=66"></script>
+  <script src="stories.js?v=66"></script>
+  <script src="monster.js?v=66"></script>
   <script>
-    var APP_VERSION = 'v65';
+    var APP_VERSION = 'v66';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號

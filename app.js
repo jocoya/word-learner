@@ -55,6 +55,10 @@ function updateChildSwitchUI() {
   var girlBtn = document.getElementById('childBtnGirl');
   if (boyBtn) boyBtn.classList.toggle('active', currentChild === 'boy');
   if (girlBtn) girlBtn.classList.toggle('active', currentChild === 'girl');
+  // 首頁「認識新朋友」卡片依目前小孩更新（沒新朋友就不能點）
+  if (typeof updateHomeLearnCard === 'function') {
+    updateHomeLearnCard().catch(function(e) { console.warn('更新認識新朋友卡片失敗', e); });
+  }
 }
 
 async function loadCurrentChild() {
@@ -70,8 +74,10 @@ const GAMES = [
   { id: 'echo',      icon: '�', name: '魔法動物園',  desc: '唸對單字叫醒恐龍',   modes: ['baby','kid'] },
   { id: 'flashlight',icon: '🔦', name: '探照燈尋寶',  desc: '用手電筒找出圖片',   modes: ['baby'] },
   { id: 'hunt',      icon: '🏠', name: '家中尋寶',   desc: '聽單字、在家找到它拍下來', modes: ['baby','kid'] },
+  { id: 'phonics',   icon: '🔤', name: '拼讀小達人', desc: '聽音找字母、看字自己念',   modes: ['baby','kid'] },
   { id: 'fillblank', icon: '📝', name: '句子排列',   desc: '把單字排成正確句子',  modes: ['kid'] },
   { id: 'spelling',  icon: '🔤', name: '拼字挑戰',   desc: '拼出正確的單字',     modes: ['kid'] },
+  { id: 'pattern',   icon: '💬', name: '仿造句子',   desc: '照句型說自己的句子並寫下來', modes: ['kid'] },
   { id: 'speak',     icon: '🎤', name: '看圖說句',   desc: '看圖說出句子',       modes: ['kid'] },
   { id: 'detective', icon: '🔍', name: '線索偵探',   desc: '認識新字＋聽線索猜字',  modes: ['kid'] },
   { id: 'match',     icon: '🔗', name: '連連看',     desc: '英文連中文',         modes: ['kid'] },
@@ -101,11 +107,16 @@ async function getMetFriends() {
   var s = await dbGet('settings', 'metFriends');
   return s || { key: 'metFriends', boy: {}, girl: {} };
 }
-async function markFriendsMet(child, wordIds) {
-  var s = await getMetFriends();
-  if (!s[child]) s[child] = {};
-  wordIds.forEach(function(id) { s[child][id] = true; });
-  await dbPut('settings', s);
+// 依序寫入：連續快速認識多個字時，避免兩次「讀-改-寫」互相覆蓋而漏標
+var _metFriendsQueue = Promise.resolve();
+function markFriendsMet(child, wordIds) {
+  _metFriendsQueue = _metFriendsQueue.catch(function() {}).then(async function() {
+    var s = await getMetFriends();
+    if (!s[child]) s[child] = {};
+    wordIds.forEach(function(id) { s[child][id] = true; });
+    await dbPut('settings', s);
+  });
+  return _metFriendsQueue;
 }
 
 // 計算「認識期」的新朋友：從沒被「認識新朋友」學過的字（reps=0 或 S<3）
@@ -170,12 +181,60 @@ async function startBannerLearn() {
   await startLearnSession({ count: 0, reward: 'coin', milestone: 0 });
 }
 
-// 首頁大按鈕版：認識新朋友（家長跟讀）→ 全部完成才跳滿版圖，點圖後給 1 鑽石
+// 首頁「認識新朋友」鑽石規則：每位小孩每天最多 1 顆，且這次至少要認識 LEARN_DIAMOND_MIN 個新字
+var LEARN_DIAMOND_MIN = 3;
+var LEARN_HOME_COUNT = 5;   // 首頁版一次最多認識幾個
+
+async function getLearnDiamondState(child) {
+  var s = await dbGet('settings', 'learnDiamond');
+  var today = getTodayStr();
+  if (!s || s.date !== today) s = { key: 'learnDiamond', date: today, boy: false, girl: false };
+  return s;
+}
+async function canEarnLearnDiamond(child) {
+  var s = await getLearnDiamondState(child);
+  return !s[child];
+}
+async function markLearnDiamondEarned(child) {
+  var s = await getLearnDiamondState(child);
+  s[child] = true;
+  await dbPut('settings', s);
+}
+
+// 首頁卡片狀態：沒有新朋友 → 變灰、不能點；今天鑽石已領 → 仍可學，但標示不再給鑽石
+async function updateHomeLearnCard() {
+  var card = document.querySelector('.profile-card.learn');
+  if (!card) return;
+  var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
+  var newFriends = await getNewFriends();
+  var desc = card.querySelector('.profile-desc');
+  if (!newFriends.length) {
+    card.disabled = true;
+    card.classList.add('is-empty');
+    card.setAttribute('aria-disabled', 'true');
+    if (desc) desc.textContent = '都認識了！去新增單字吧';
+    return;
+  }
+  card.disabled = false;
+  card.classList.remove('is-empty');
+  card.removeAttribute('aria-disabled');
+  var canDiamond = await canEarnLearnDiamond(child);
+  if (desc) {
+    desc.textContent = '還有 ' + newFriends.length + ' 個新朋友' +
+      (canDiamond ? ' · 認識 ' + LEARN_DIAMOND_MIN + ' 個得 💎' : ' · 今天 💎 已領');
+  }
+}
+
+// 首頁大按鈕版：認識新朋友（家長跟讀）→ 一次最多 5 個；認識滿 3 個且今天還沒領才給 1 鑽石
 async function startHomeLearn() {
   var newFriends = await getNewFriends();
-  if (!newFriends.length) { alert('目前沒有新朋友囉！所有單字都認識過了 🎉'); return; }
+  if (!newFriends.length) {
+    alert('目前沒有新朋友囉！所有單字都認識過了 🎉');
+    updateHomeLearnCard();
+    return;
+  }
   currentMode = 'kid';
-  await startLearnSession({ count: 0, reward: 'diamond', milestone: 0 });
+  await startLearnSession({ count: LEARN_HOME_COUNT, reward: 'diamond', milestone: 0 });
 }
 
 async function getGameWords() {

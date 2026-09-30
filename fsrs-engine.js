@@ -207,6 +207,20 @@ function gameToRating(payload) {
     return hint > 0 ? 2 : 3;
   }
 
+  // 拼讀（phonics）：小寶貝聽首音 / 挑戰看字拼讀後選意思 → 一次對 Good(3)，錯過再對 Hard(2)，多次錯 Again(1)
+  if (gt === 'phonics') {
+    if (m === 0) return 3;
+    if (m === 1) return 2;
+    return 1;
+  }
+
+  // 仿造句子（pattern）：自己說 + 自己寫出含目標字的句子 = 主動產出，記憶效果最好 → Easy(4)
+  // 只說沒寫 / 家長覺得需要幫忙才完成 → Good(3)；家長判定沒用對字 → Hard(2)（仍有練到，不當成忘記）
+  if (gt === 'pattern') {
+    if (m === 0) return hint > 0 ? 3 : 4;
+    return 2;
+  }
+
   // 睡前故事（story）：聽故事時點出重點字圖片，屬於輕度接觸 → 只給 Hard(2)，維持記憶但不推升太快
   if (gt === 'story') {
     return 2;

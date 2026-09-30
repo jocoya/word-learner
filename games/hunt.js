@@ -13,13 +13,15 @@ var HUNT_MAX_PHOTOS = 3;   // 每個單字最多保留幾張照片；超過會�
 // 家裡較常找得到的標籤（英文標籤，與專案標籤慣例一致）
 var HUNT_HOME_TAGS = ['home', 'house', 'kitchen', 'food', 'fruit', 'vegetable', 'toy', 'toys', 'bathroom', 'bedroom',
   'living room', 'furniture', 'clothes', 'clothing', 'school', 'stationery', 'body', 'color', 'colors', 'shape', 'shapes',
-  'animal', 'animals', 'pet', 'drink', 'daily', 'object', 'objects', 'things'];
+  'animal', 'animals', 'pet', 'drink', 'daily', 'object', 'objects', 'things', 'family', 'hobbies'];
 var HUNT_COLOR_WORDS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'black', 'white', 'brown', 'gray', 'grey', 'gold', 'silver'];
 
 // 判斷單字要出哪種任務
 function huntTaskType(w) {
   var word = String(w.word || '').toLowerCase().trim();
   var tags = (w.tags || []).map(function(t) { return String(t).toLowerCase(); });
+  // 功能詞（a、the、of、he…）與片語（a few、in front of）無法找也無法演
+  if (tags.indexOf('grammar') !== -1 || word.indexOf(' ') !== -1) return null;
   if (HUNT_COLOR_WORDS.indexOf(word) !== -1 || tags.indexOf('color') !== -1 || tags.indexOf('colors') !== -1) return 'look';
   if (w.pos === 'verb') return 'act';
   if (w.pos === 'adj') return 'look';

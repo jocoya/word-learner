@@ -160,7 +160,9 @@ async function startLearnSession(config) {
       }
       // 立刻標記「已認識」（不等結算），避免中途離開或測試模式時又重複跳同一個字
       var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
-      if (typeof markFriendsMet === 'function') { markFriendsMet(child, [target.id]); }
+      if (typeof markFriendsMet === 'function') {
+        markFriendsMet(child, [target.id]).catch(function(e) { console.warn('標記已認識失敗', e); });
+      }
       learnedFriends.push(target);
       current++;
       document.getElementById('gameScore').textContent = current + '/' + total;
@@ -197,29 +199,54 @@ async function startLearnSession(config) {
     var child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
     var devSkip = (typeof devSkipRewards === 'function' && devSkipRewards());
 
-    // 標記這批新朋友「已認識」，之後不再列為新朋友（避免重複跳出）
-    if (!devSkip && typeof markFriendsMet === 'function') {
+    // 標記這批新朋友「已認識」，之後不再列為新朋友（測試模式也要標記，避免重複領）
+    if (typeof markFriendsMet === 'function') {
       await markFriendsMet(child, learnedFriends.map(function(w) { return w.id; }));
     }
 
+    // 首頁鑽石：每位小孩每天最多 1 顆，而且這次要認識滿 LEARN_DIAMOND_MIN 個
+    var minForDiamond = (typeof LEARN_DIAMOND_MIN !== 'undefined') ? LEARN_DIAMOND_MIN : 3;
+    var gaveReward = false;
     if (!devSkip && typeof getCoins === 'function') {
-      var coins = await getCoins();
       if (reward === 'diamond') {
-        var field = child === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
-        coins[field] = coins[field] || {};
-        coins[field]['diamond'] = (coins[field]['diamond'] || 0) + 1;
-        coins.log.push({ role: child, count: 0, date: getTodayStr(), chest: '💎 認識 ' + learnedFriends.length + ' 個新朋友' });
+        var enough = learnedFriends.length >= minForDiamond;
+        var canDiamond = (typeof canEarnLearnDiamond === 'function') ? await canEarnLearnDiamond(child) : true;
+        if (enough && canDiamond) {
+          // 先標記再發獎，避免中途被回收後重開又領一次
+          if (typeof markLearnDiamondEarned === 'function') await markLearnDiamondEarned(child);
+          var coins = await getCoins();
+          var field = child === 'boy' ? 'rewardsBoy' : 'rewardsGirl';
+          coins[field] = coins[field] || {};
+          coins[field]['diamond'] = (coins[field]['diamond'] || 0) + 1;
+          coins.log.push({ role: child, count: 0, date: getTodayStr(), chest: '💎 認識 ' + learnedFriends.length + ' 個新朋友' });
+          await saveCoins(coins);
+          gaveReward = true;
+        }
       } else {
-        coins[child] = (coins[child] || 0) + 1;
-        coins.log.push({ role: child, count: 1, date: getTodayStr(), chest: '🦍 認識新朋友' });
+        var coins2 = await getCoins();
+        coins2[child] = (coins2[child] || 0) + 1;
+        coins2.log.push({ role: child, count: 1, date: getTodayStr(), chest: '🦍 認識新朋友' });
+        await saveCoins(coins2);
+        gaveReward = true;
       }
-      await saveCoins(coins);
     }
 
-    if (typeof showRewardImage === 'function') {
-      showRewardImage(reward === 'diamond' ? 'diamond' : 'coin', function() { goTo('page-home'); });
-    } else {
+    function backHome() {
       goTo('page-home');
+      if (typeof updateHomeLearnCard === 'function') updateHomeLearnCard();
+    }
+
+    if (gaveReward && typeof showRewardImage === 'function') {
+      showRewardImage(reward === 'diamond' ? 'diamond' : 'coin', backHome);
+    } else if (reward === 'diamond' && !devSkip) {
+      // 沒拿到鑽石：說清楚原因，孩子才不會以為壞掉
+      var why = learnedFriends.length < minForDiamond
+        ? '這次認識了 ' + learnedFriends.length + ' 個新朋友，認識滿 ' + minForDiamond + ' 個才有 💎 喔！'
+        : '今天的 💎 已經拿過了，明天再來認識新朋友吧！';
+      alert('🎉 認識了 ' + learnedFriends.length + ' 個新朋友！\n' + why);
+      backHome();
+    } else {
+      backHome();
     }
   }
 

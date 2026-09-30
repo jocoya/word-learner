@@ -23,46 +23,84 @@ async function openStoryZone() {
   await renderStoryList();
 }
 
-// ---------- 自動挑字 ----------
-// 優先：今天玩過的 → FSRS 到期 → 最近學過還在鞏固（reps≥1, S<8）→ 其他
+// ---------- 自動挑字（分級）----------
+// 研究：讀者要認得大部分的字，故事才讀得順、新字才學得起來。
+// 所以故事 = 「已熟悉的字」當骨架 + 少量「正在學的字」當重點字：
+//   focus（重點字，要點圖、算複習）：STORY_NEW_WORDS 個，優先今天學過 / 到期 / 還在鞏固
+//   known（已熟悉，熟悉期以上）：用來撐起句子，不算複習
+// 已熟悉的字不足時，重點字自動增加，總數維持 STORY_WORDS 個
+var STORY_NEW_WORDS = 2;
+
 async function pickBedtimeWords() {
   var words = await dbGetByIndex('words', 'pool', 'permanent');
   var today = getTodayStr();
   var now = Date.now();
-  var scored = [];
+  var learning = [], known = [];
   for (var i = 0; i < words.length; i++) {
     var w = words[i];
+    // 片語與功能詞（a few、the）不當故事主角
+    if (/\s/.test(w.word) || (w.tags || []).indexOf('grammar') !== -1) continue;
     var p = (typeof getProgressFor === 'function') ? await getProgressFor(w.id) : null;
     var up = p && typeof fsrsUpgrade === 'function' ? fsrsUpgrade(p) : p;
+    var lvl = (up && typeof getWordStageLevel === 'function') ? getWordStageLevel(up) : 0;
+    var hasImg = getAllImages(w).length > 0 ? 0 : 1;
+    if (up && up.reps > 0 && lvl >= 1) {
+      known.push({ w: w, img: hasImg, r: Math.random() });
+      continue;
+    }
     var pri = 4;
     if (up && up.reps > 0) {
       if (up.todayReviewed === today) pri = 0;
       else if (up.due && up.due <= now) pri = 1;
-      else if ((up.stability || 0) < 8) pri = 2;
-      else pri = 3;
+      else pri = 2;
+    } else {
+      pri = 3; // 還沒學過的新字：放最後
     }
-    // 故事需要能「點圖片」：有圖片的字優先
-    var hasImg = getAllImages(w).length > 0;
-    scored.push({ w: w, pri: pri, img: hasImg ? 0 : 1, r: Math.random() });
+    learning.push({ w: w, pri: pri, img: hasImg, r: Math.random() });
   }
-  scored.sort(function(a, b) { return (a.pri - b.pri) || (a.img - b.img) || (a.r - b.r); });
-  return scored.slice(0, STORY_WORDS).map(function(x) { return x.w; });
+  learning.sort(function(a, b) { return (a.pri - b.pri) || (a.img - b.img) || (a.r - b.r); });
+  known.sort(function(a, b) { return (a.img - b.img) || (a.r - b.r); });
+
+  var knownPick = known.slice(0, STORY_WORDS - STORY_NEW_WORDS).map(function(x) { return x.w; });
+  var focusPick = learning.slice(0, STORY_WORDS - knownPick.length).map(function(x) { return x.w; });
+  // 正在學的字不夠時，用已熟悉的字補滿
+  if (knownPick.length + focusPick.length < STORY_WORDS) {
+    knownPick = known.slice(0, STORY_WORDS - focusPick.length).map(function(x) { return x.w; });
+  }
+  return { focus: focusPick, known: knownPick };
 }
 
 // ---------- 生成（只有文字）----------
-function buildStoryPrompt(words) {
-  var list = words.map(function(w, i) {
-    return (i + 1) + '. ' + w.word + (w.meaning ? '（' + w.meaning + '）' : '');
-  }).join('\n');
+// picked: { focus:[word], known:[word] }；相容舊呼叫（直接傳陣列 = 全部當重點字）
+function buildStoryPrompt(picked) {
+  if (Array.isArray(picked)) picked = { focus: picked, known: [] };
+  var fmt = function(w) { return w.word + (w.meaning ? '（' + w.meaning + '）' : ''); };
+  var focusList = picked.focus.map(function(w, i) { return (i + 1) + '. ' + fmt(w); }).join('\n');
+  var knownList = picked.known.map(fmt).join(', ');
   return 'You are writing a gentle bedtime story for a Taiwanese child aged 5-9 who is learning English.\n' +
-    'Target words:\n' + list + '\n\n' +
-    'Rules:\n' +
+    'NEW words the child is learning (the story is about these):\n' + focusList + '\n' +
+    (knownList ? 'Words the child ALREADY KNOWS (use them freely): ' + knownList + '\n' : '') +
+    '\nRules:\n' +
     '- Exactly ' + STORY_PAGES + ' pages. Calm, cozy, happy ending, kid-safe.\n' +
-    '- Each page: 1-2 very simple English sentences (CEFR A1, under 25 words).\n' +
-    '- Each page must use ONE target word as its "focus" word, written exactly as given. Use every target word at least once across the story.\n' +
-    '- "zh" is a natural Traditional Chinese (Taiwan) translation.\n\n' +
+    '- Each page: 1-2 very short English sentences (CEFR Pre-A1/A1, under 20 words).\n' +
+    '- Use ONLY the words above plus the simplest everyday words (I, you, a, the, is, like, go, see, big, happy...). Avoid any other hard word.\n' +
+    '- Each page has ONE "focus" word, written exactly as given, chosen from the NEW words. Use every NEW word at least twice across the story so the child hears it again.\n' +
+    '- "zh" is a natural Traditional Chinese (Taiwan) translation.\n' +
+    '- After the pages, write 2 very easy comprehension questions in English about the story, each with 3 short options and the correct option index (0-2).\n\n' +
     'Reply with ONLY this JSON, no markdown:\n' +
-    '{"title":"English title","titleZh":"中文標題","pages":[{"en":"...","zh":"...","focus":"target word"}]}';
+    '{"title":"English title","titleZh":"中文標題","pages":[{"en":"...","zh":"...","focus":"new word"}],' +
+    '"questions":[{"q":"...","qZh":"中文題目","options":["...","...","..."],"answer":0}]}';
+}
+
+// 理解題：容錯解析，最多 2 題；格式不對就略過（故事照樣可以讀）
+function parseStoryQuestions(data) {
+  var qs = Array.isArray(data.questions) ? data.questions : [];
+  return qs.slice(0, 2).map(function(q) {
+    var opts = Array.isArray(q.options) ? q.options.map(function(o) { return String(o).trim(); }).filter(Boolean).slice(0, 3) : [];
+    var ans = parseInt(q.answer, 10);
+    if (!q.q || opts.length < 2 || isNaN(ans) || ans < 0 || ans >= opts.length) return null;
+    return { q: String(q.q).trim(), qZh: String(q.qZh || '').trim(), options: opts, answer: ans };
+  }).filter(Boolean);
 }
 
 // 從模型回應抓出 JSON（容忍 ```json 包裹或前後多餘文字），並把 focus 對應回單字
@@ -90,7 +128,12 @@ function parseStoryJson(text, words) {
     return { en: en, zh: String(p.zh || '').trim(), focusId: w ? w.id : null, focusWord: w ? w.word : '' };
   }).filter(function(p) { return p.en; });
   if (pages.length < STORY_PAGES) throw new Error('只產生 ' + pages.length + ' 頁（需要 ' + STORY_PAGES + ' 頁）');
-  return { title: String(data.title || 'Bedtime Story').trim(), titleZh: String(data.titleZh || '').trim(), pages: pages };
+  return {
+    title: String(data.title || 'Bedtime Story').trim(),
+    titleZh: String(data.titleZh || '').trim(),
+    pages: pages,
+    questions: parseStoryQuestions(data)
+  };
 }
 
 async function startBedtimeStory() {
@@ -100,22 +143,28 @@ async function startBedtimeStory() {
   if (btn) btn.disabled = true;
   try {
     setStoryProgress('🔍 挑今天的單字…');
-    var words = await pickBedtimeWords();
-    if (words.length < 3) throw new Error('單字太少，至少要有 3 個單字才能寫故事');
-    var prompt = buildStoryPrompt(words);
+    var picked = await pickBedtimeWords();
+    if (picked.focus.length < 1 || picked.focus.length + picked.known.length < 3) {
+      throw new Error('單字太少，至少要有 3 個單字才能寫故事');
+    }
+    var prompt = buildStoryPrompt(picked);
     var story = null, lastErr = null;
     for (var attempt = 1; attempt <= 3 && !story; attempt++) {
       setStoryProgress('✍️ 正在寫故事…' + (attempt > 1 ? '（重試第 ' + attempt + ' 次）' : '') +
-        '　今天的字：' + words.map(function(w) { return w.word; }).join(', '));
+        '\n今天的新字：' + picked.focus.map(function(w) { return w.word; }).join(', ') +
+        (picked.known.length ? '　複習：' + picked.known.map(function(w) { return w.word; }).join(', ') : ''));
       try {
-        var text = await aiChat(prompt, { temperature: 0.8, maxTokens: 1500, timeout: 120000, json: true });
-        story = parseStoryJson(text, words);
+        var text = await aiChat(prompt, { temperature: 0.8, maxTokens: 1800, timeout: 120000, json: true });
+        // 只有「正在學的字」當重點字（點圖、算複習）
+        story = parseStoryJson(text, picked.focus);
       } catch (e) { lastErr = e; }
     }
     if (!story) throw new Error('故事生成失敗：' + (lastErr ? lastErr.message : '未知錯誤') + '\n請確認電腦上的 AI（Ollama / LM Studio）有開。');
+    var allPicked = picked.focus.concat(picked.known);
     story.id = 'story-' + Date.now();
-    story.wordIds = words.map(function(w) { return w.id; });
-    story.words = words.map(function(w) { return w.word; });
+    story.wordIds = allPicked.map(function(w) { return w.id; });
+    story.words = allPicked.map(function(w) { return w.word; });
+    story.focusWords = picked.focus.map(function(w) { return w.word; });
     story.child = (typeof currentChild !== 'undefined') ? currentChild : 'boy';
     story.createdAt = Date.now();
     // 直接存入書架，不用再按「存入」；不想要可以在書架刪除
@@ -195,18 +244,28 @@ async function openStoryReader(story) {
 function closeStoryReader() {
   stopStoryReading();
   storyViewing = null;
+  var quiz = storyEl('storyQuiz');
+  if (quiz) quiz.hidden = true;
+  var reader = document.querySelector('#page-story-reader .story-reader');
+  if (reader) reader.hidden = false;
   goTo('page-stories');
   renderStoryList();
 }
 
-function highlightStoryWords(text, words) {
+// 標亮：重點字（focus）黃色 <mark>；已熟悉的字淡藍色 <mark class="story-known">
+// 一次比對所有字，避免 <mark> 標籤被第二輪取代弄壞
+function highlightStoryWords(text, words, focusWords) {
   var html = esc(text);
-  (words || []).forEach(function(w) {
-    if (!w) return;
-    var safe = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    html = html.replace(new RegExp('\\b(' + safe + '(?:s|es|ed|ing)?)\\b', 'gi'), '<mark>$1</mark>');
+  var focusSet = {};
+  (focusWords || words || []).forEach(function(w) { if (w) focusSet[String(w).toLowerCase()] = true; });
+  var list = (words || []).filter(Boolean).slice().sort(function(a, b) { return b.length - a.length; });
+  if (!list.length) return html;
+  var alt = list.map(function(w) { return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|');
+  var re = new RegExp('\\b(' + alt + ')((?:s|es|ed|ing)?)\\b', 'gi');
+  return html.replace(re, function(m, base) {
+    var isFocus = focusSet[base.toLowerCase()];
+    return isFocus ? '<mark>' + m + '</mark>' : '<mark class="story-known">' + m + '</mark>';
   });
-  return html;
 }
 
 // 每頁：大圖（重點字的圖片）+ 句子；點圖 = 小互動
@@ -223,11 +282,16 @@ function renderStoryPage() {
   } else {
     pic.innerHTML = '<div class="story-reader-noimg">🌙</div>';
   }
-  storyEl('storyReaderEn').innerHTML = highlightStoryWords(p.en, s.words);
+  storyEl('storyReaderEn').innerHTML = highlightStoryWords(p.en, s.words, s.focusWords);
   storyEl('storyReaderZh').textContent = p.zh || '';
   storyEl('storyReaderPage').textContent = (storyPageIdx + 1) + ' / ' + s.pages.length;
   storyEl('storyPrevBtn').disabled = storyPageIdx === 0;
-  storyEl('storyNextBtn').disabled = storyPageIdx >= s.pages.length - 1;
+  // 最後一頁：有理解題就把「下一頁」變成「回答問題」
+  var isLast = storyPageIdx >= s.pages.length - 1;
+  var hasQ = s.questions && s.questions.length;
+  var nextBtn = storyEl('storyNextBtn');
+  nextBtn.disabled = isLast && !hasQ;
+  nextBtn.textContent = isLast && hasQ ? '❓ 回答問題' : '下一頁 ▶';
   var ask = storyEl('storyTapAsk');
   if (w && img && !storyTapDone[storyPageIdx]) {
     ask.innerHTML = '👆 <b>' + esc(w.word) + '</b> 在哪裡？點點圖片！';
@@ -265,9 +329,78 @@ async function storyTapPicture() {
 function storyGoPage(delta) {
   if (!storyViewing) return;
   var next = storyPageIdx + delta;
+  if (next >= storyViewing.pages.length && delta > 0 && storyViewing.questions && storyViewing.questions.length) {
+    stopStoryReading();
+    showStoryQuestions();
+    return;
+  }
   if (next < 0 || next >= storyViewing.pages.length) return;
   stopStoryReading();
   storyPageIdx = next;
+  renderStoryPage();
+}
+
+// ---------- 讀完的理解題（不寫 FSRS，答對給鼓勵；答錯可再選）----------
+function showStoryQuestions() {
+  var s = storyViewing;
+  var qs = s.questions || [];
+  var idx = 0, firstTry = 0;
+  var box = storyEl('storyQuiz');
+  var reader = document.querySelector('#page-story-reader .story-reader');
+  reader.hidden = true;
+  box.hidden = false;
+
+  function render() {
+    if (idx >= qs.length) {
+      box.innerHTML = '<div class="story-quiz-done">' +
+        '<div class="story-quiz-emoji">' + (firstTry === qs.length ? '🌟' : '👍') + '</div>' +
+        '<div class="story-quiz-title">' + (firstTry === qs.length ? '全部一次答對！' : '讀完了，好棒！') + '</div>' +
+        '<div class="story-sub">一次答對 ' + firstTry + ' / ' + qs.length + ' 題</div>' +
+        '<div class="story-quiz-btns">' +
+          '<button class="btn-sm" onclick="backToStoryPages()">📖 再讀一次</button>' +
+          '<button class="btn-sm btn-green" onclick="closeStoryReader()">🌙 晚安</button>' +
+        '</div></div>';
+      return;
+    }
+    var q = qs[idx];
+    var tried = false;
+    box.innerHTML = '<div class="story-quiz-q">' +
+        '<div class="story-quiz-no">❓ ' + (idx + 1) + ' / ' + qs.length + '</div>' +
+        '<div class="story-quiz-en">' + esc(q.q) + ' <button class="story-quiz-speak" id="storyQuizSpeak" aria-label="念題目">🔊</button></div>' +
+        (q.qZh ? '<div class="story-quiz-zh">' + esc(q.qZh) + '</div>' : '') +
+        '<div class="story-quiz-opts">' +
+          q.options.map(function(o, i) { return '<button class="story-quiz-opt" data-i="' + i + '">' + esc(o) + '</button>'; }).join('') +
+        '</div>' +
+        '<div class="story-quiz-fb" id="storyQuizFb" role="status" aria-live="polite"></div>' +
+      '</div>';
+    setTimeout(function() { speakWord(q.q, 0.75); }, 300);
+    storyEl('storyQuizSpeak').onclick = function() { speakWord(q.q, 0.75); };
+    box.querySelectorAll('.story-quiz-opt').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var i = parseInt(b.dataset.i, 10);
+        speakWord(q.options[i], 0.75);
+        if (i === q.answer) {
+          if (!tried) firstTry++;
+          b.classList.add('correct');
+          box.querySelectorAll('.story-quiz-opt').forEach(function(x) { x.disabled = true; });
+          storyEl('storyQuizFb').textContent = '🎉 答對了！';
+          setTimeout(function() { idx++; render(); }, 1300);
+        } else {
+          tried = true;
+          b.classList.add('wrong');
+          b.disabled = true;
+          storyEl('storyQuizFb').textContent = '再想想看～';
+        }
+      });
+    });
+  }
+  render();
+}
+
+function backToStoryPages() {
+  storyEl('storyQuiz').hidden = true;
+  document.querySelector('#page-story-reader .story-reader').hidden = false;
+  storyPageIdx = 0;
   renderStoryPage();
 }
 

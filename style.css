@@ -2158,6 +2158,10 @@ body {
   border: 3px solid #FFB74D;
 }
 .profile-card.learn .profile-name { color: #E65100; }
+.profile-card.learn .profile-desc { color: #BF360C; }
+/* 沒有新朋友：變灰、不能點 */
+.profile-card.learn.is-empty { filter: grayscale(1); opacity: .55; cursor: not-allowed; }
+.profile-card.learn.is-empty:hover, .profile-card.learn.is-empty:active { transform: none; box-shadow: none; }
 
 /* ===== 首頁「家中尋寶」卡片 ===== */
 .profile-card.hunt {
@@ -2514,6 +2518,23 @@ body {
 .story-reader-text { flex: 1; max-width: 640px; display: flex; flex-direction: column; gap: 16px; }
 .story-reader-en { font-size: 2em; line-height: 1.5; font-weight: 600; color: #333; }
 .story-reader-en mark { background: #FFF176; border-radius: 6px; padding: 0 4px; }
+.story-reader-en mark.story-known { background: #E3F2FD; color: #1565C0; }
+.story-quiz { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.story-quiz[hidden] { display: none; }
+.story-quiz-q, .story-quiz-done { max-width: 760px; width: 100%; text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+.story-quiz-no { color: #5C6BC0; font-weight: 700; }
+.story-quiz-en { font-size: 2em; font-weight: 700; color: #333; }
+.story-quiz-zh { font-size: 1.2em; color: #888; }
+.story-quiz-speak { border: none; background: none; font-size: .8em; cursor: pointer; }
+.story-quiz-opts { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 520px; }
+.story-quiz-opt { padding: 16px; font-size: 1.4em; border-radius: 16px; border: 3px solid #C5CAE9; background: #fff; cursor: pointer; }
+.story-quiz-opt.correct { background: #E8F5E9; border-color: #43A047; }
+.story-quiz-opt.wrong { background: #FFEBEE; border-color: #E57373; opacity: .6; }
+.story-quiz-fb { min-height: 1.5em; font-size: 1.4em; }
+.story-quiz-emoji { font-size: 5em; }
+.story-quiz-title { font-size: 2em; font-weight: 700; color: #3949AB; }
+.story-quiz-btns { display: flex; gap: 12px; }
+.story-quiz-btns .btn-sm { font-size: 1.1em; padding: 12px 20px; }
 .story-reader-zh { font-size: 1.3em; color: #777; line-height: 1.5; }
 .story-zh-hidden { visibility: hidden; }
 .story-reader-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -2525,3 +2546,72 @@ body {
   .story-reader-en { font-size: 1.5em; }
   .story-list { grid-template-columns: 1fr; }
 }
+
+/* ===== 拼讀小達人 ===== */
+.phon { max-width: 900px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.phon-progress { color: #5E35B1; font-weight: 700; font-size: 1.1em; }
+.phon-prompt { font-size: 1.4em; color: #444; }
+.phon-pic { width: min(320px, 70vw); aspect-ratio: 1; border-radius: 24px; border: 4px solid #B39DDB; background: #F3E5F5; overflow: hidden; padding: 0; cursor: pointer; }
+.phon-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.phon-pic-empty { font-size: 4em; }
+.phon-letters { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+.phon-letter { width: 150px; padding: 16px 10px; border-radius: 22px; border: 3px solid #B39DDB; background: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.phon-letter-big { font-size: 4em; font-weight: 800; color: #5E35B1; line-height: 1; }
+.phon-letter-key { font-size: .95em; color: #888; }
+.phon-letter.correct, .phon-choice.correct { background: #E8F5E9; border-color: #43A047; }
+.phon-letter.wrong, .phon-choice.wrong { background: #FFEBEE; border-color: #E57373; opacity: .6; }
+.phon-word { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; font-size: 5em; font-weight: 800; letter-spacing: 2px; }
+.phon-part { color: #333; }
+.phon-chunk { color: #E65100; background: #FFF3E0; border-radius: 14px; padding: 0 8px; }
+.phon-actions { display: flex; gap: 12px; align-items: center; }
+.phon-speak { padding: 14px 32px; border-radius: 20px; border: none; background: linear-gradient(135deg, #7E57C2, #5E35B1); color: #fff; font-size: 1.3em; font-weight: 700; cursor: pointer; }
+.phon-actions .btn-sm { font-size: 1.05em; padding: 12px 18px; }
+.phon-choices { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+.phon-choice { width: 200px; border-radius: 18px; border: 3px solid #D1C4E9; background: #fff; padding: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; align-items: center; font-size: 1.2em; }
+.phon-choice img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; }
+.phon-feedback { min-height: 1.6em; font-size: 1.5em; }
+.phon-win { color: #2E7D32; font-weight: 700; }
+
+/* ===== 課綱字表進度 ===== */
+.moe-progress { display: flex; flex-direction: column; gap: 16px; background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.moe-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.moe-track { position: relative; height: 18px; border-radius: 9px; background: #EEE; overflow: hidden; }
+.moe-fill-lib { position: absolute; inset: 0 auto 0 0; background: #CFD8DC; }
+.moe-fill-fam { position: absolute; inset: 0 auto 0 0; }
+.moe-row-foot { font-size: .85em; color: #888; margin-top: 4px; }
+.moe-progress .btn-sm { align-self: flex-start; }
+.moe-hint { color: #777; font-size: .9em; }
+.moe-form { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+.moe-form select { padding: 6px 8px; border-radius: 8px; border: 1px solid #ccc; margin-left: 4px; }
+.moe-check { display: flex; align-items: center; gap: 6px; }
+
+/* ===== 仿造句子 ===== */
+.pat { max-width: 960px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center; }
+.pat-progress { color: #00897B; font-weight: 700; font-size: 1.1em; }
+.pat-card { display: flex; gap: 16px; align-items: center; background: #fff; border-radius: 20px; padding: 12px 24px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.pat-img { width: 110px; height: 110px; object-fit: cover; border-radius: 14px; }
+.pat-word { font-size: 2.6em; font-weight: 800; color: #00897B; line-height: 1.1; }
+.pat-mean { color: #777; font-size: 1.1em; }
+.pat-step { font-size: 1.15em; color: #555; margin-top: 6px; }
+.pat-model { font-size: 2.2em; font-weight: 700; color: #333; }
+.pat-model mark, .pat-final mark { background: #B2DFDB; border-radius: 6px; padding: 0 4px; }
+.pat-blank { display: inline-block; min-width: 2.5em; border-bottom: 3px dashed #00897B; color: transparent; }
+.pat-model-zh { color: #888; font-size: 1.1em; }
+.pat-example { color: #999; font-size: 1em; }
+.pat-mini { border: none; background: none; font-size: .7em; cursor: pointer; vertical-align: middle; }
+.pat-say { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.pat-mic { padding: 14px 32px; border-radius: 20px; border: none; background: linear-gradient(135deg, #26A69A, #00897B); color: #fff; font-size: 1.3em; font-weight: 700; cursor: pointer; }
+.pat-mic.recording { background: #E53935; }
+.pat-say .btn-sm, .pat-actions .btn-sm { font-size: 1.05em; padding: 12px 18px; }
+.pat-heard { min-height: 1.3em; color: #555; font-size: 1.1em; }
+.pat-write { display: flex; flex-direction: column; gap: 8px; align-items: center; width: 100%; }
+.pat-input { width: min(720px, 92vw); font-size: 1.6em; padding: 14px 18px; border-radius: 14px; border: 3px solid #B2DFDB; }
+.pat-input:focus { outline: none; border-color: #00897B; }
+.pat-input-tip { min-height: 1.2em; color: #E65100; }
+.pat-input-tip.ok { color: #2E7D32; }
+.pat-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.pat-confirm { background: #fff; border-radius: 16px; padding: 16px 24px; box-shadow: 0 2px 10px rgba(0,0,0,.08); display: flex; flex-direction: column; gap: 12px; }
+.pat-final { font-size: 1.6em; font-weight: 600; }
+.pat-confirm-q { font-size: 1.15em; }
+.pat-feedback { min-height: 1.6em; font-size: 1.4em; }
+.pat-win { color: #2E7D32; font-weight: 700; }
