@@ -147,7 +147,11 @@ async function main() {
 
   const usage = readJson(USAGE, {});
   const month = monthKey();
-  const used = usage[month] || 0;
+  // 雲端自動產生（Cloud Functions）用的字元記在 App 的 settings/ttsUsage；
+  // 備份檔裡有這筆就一起算，兩邊加起來才不會超過免費額度
+  const cloudUsage = ((backup.settings || []).find(s => s && s.key === 'ttsUsage') || {})[month] || 0;
+  const used = (usage[month] || 0) + cloudUsage;
+  if (cloudUsage) console.log('   （含雲端自動產生 ' + cloudUsage.toLocaleString() + ' 字元）');
   console.log('\n🎙️  聲音：' + cfg.voice + '　模式：' + mode);
   console.log('   共 ' + items.length + ' 筆，已完成 ' + (items.length - todo.length) + '，這次要做 ' + todo.length + ' 筆');
   console.log('   這次約 ' + chars.toLocaleString() + ' 字元；本月已用 ' + used.toLocaleString() + ' / 預算 ' + cfg.monthlyCharBudget.toLocaleString());

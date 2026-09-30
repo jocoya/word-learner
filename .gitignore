@@ -3,6 +3,11 @@ tools/tts/config.json
 tools/tts/output/
 tools/tts/*.log
 
+# Cloud Functions
+functions/node_modules/
+firebase-debug.log
+*.local
+
 # 從 App 匯出的資料（含單字與學習進度）
 *-backup-*.json
 word-learner-backup*.json

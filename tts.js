@@ -48,16 +48,20 @@ function ttsUpgradeManifest(s) {
 }
 
 // 語音清單存在 settings（跟著 IndexedDB + Firestore 同步，離線可讀，不受 Storage CORS 限制）
+// 有網路：以雲端為準（雲端函式會自動加入新單字的音檔）；離線：用本機快取
 async function loadTtsManifest() {
   try {
-    var s = (typeof dbGet === 'function') ? await dbGet('settings', TTS_SETTINGS_KEY) : null;
-    if (!s && typeof firestore !== 'undefined' && navigator.onLine) {
-      var doc = await firestore.collection('settings').doc(TTS_SETTINGS_KEY).get();
-      if (doc.exists) {
-        s = doc.data();
-        if (typeof dbPutLocal === 'function') await dbPutLocal('settings', s);
-      }
+    var s = null;
+    if (typeof firestore !== 'undefined' && navigator.onLine) {
+      try {
+        var doc = await firestore.collection('settings').doc(TTS_SETTINGS_KEY).get();
+        if (doc.exists) {
+          s = doc.data();
+          if (typeof dbPutLocal === 'function') await dbPutLocal('settings', s);
+        }
+      } catch (e) { s = null; }
     }
+    if (!s && typeof dbGet === 'function') s = await dbGet('settings', TTS_SETTINGS_KEY);
     ttsManifest = ttsUpgradeManifest(s);
     ttsReady = !!ttsManifest && Object.keys(ttsManifest.voices).some(function(v) {
       return Object.keys(ttsManifest.voices[v].items || {}).length > 0;
@@ -68,12 +72,34 @@ async function loadTtsManifest() {
   return ttsReady;
 }
 
+// 儲存前先合併雲端最新的清單：雲端函式可能剛自動加了新音檔，不能被這份舊清單整份蓋掉
 async function saveTtsManifest(m) {
   m.key = TTS_SETTINGS_KEY;
   m.updatedAt = Date.now();
+  var remote = await ttsFetchRemoteManifest();
+  if (remote && remote.voices) {
+    Object.keys(remote.voices).forEach(function(v) {
+      var rv = remote.voices[v];
+      if (!m.voices[v]) {
+        // 雲端有、這份沒有：除非是這次刻意刪除的聲音，否則保留
+        if (!(m._deleted && m._deleted.indexOf(v) !== -1)) m.voices[v] = rv;
+        return;
+      }
+      m.voices[v].items = Object.assign({}, rv.items || {}, m.voices[v].items || {});
+    });
+  }
+  delete m._deleted;
   await dbPut('settings', m);
   ttsManifest = m;
   ttsReady = Object.keys(m.voices).some(function(v) { return Object.keys(m.voices[v].items || {}).length > 0; });
+}
+
+async function ttsFetchRemoteManifest() {
+  if (typeof firestore === 'undefined' || !navigator.onLine) return null;
+  try {
+    var doc = await firestore.collection('settings').doc(TTS_SETTINGS_KEY).get();
+    return doc.exists ? ttsUpgradeManifest(doc.data()) : null;
+  } catch (e) { return null; }
 }
 
 // 是句子還是單字：依清單記錄的種類（ice cream 是單字，不能用「有沒有空白」判斷）
@@ -274,14 +300,27 @@ async function devChooseTtsVoice() {
       return '<option value="' + esc(n) + '"' + (n === sel ? ' selected' : '') + '>' + esc(n) + '（' + c + ' 個）</option>';
     }).join('');
   }
+  // 自動產生：預設 = 目前單字 + 句子用的聲音
+  var auto = Array.isArray(ttsManifest.autoVoices) && ttsManifest.autoVoices.length
+    ? ttsManifest.autoVoices : [ttsManifest.wordVoice, ttsManifest.sentenceVoice];
+  var autoOn = ttsManifest.autoEnabled !== false;
+  var checks = names.map(function(n) {
+    return '<label class="tts-auto-item"><input type="checkbox" class="tts-auto-cb" value="' + esc(n) + '"' +
+      (auto.indexOf(n) !== -1 ? ' checked' : '') + '> ' + esc(n) + '</label>';
+  }).join('');
   devOut('<div class="tts-voice-pick">' +
     '<label>念單字：<select id="ttsWordVoice">' + opts(ttsManifest.wordVoice) + '</select></label>' +
     '<label>念句子：<select id="ttsSentenceVoice">' + opts(ttsManifest.sentenceVoice) + '</select></label>' +
     '<div class="tts-voice-btns">' +
       '<button class="dev-btn" onclick="devTtsPreview(\'ttsWordVoice\',\'apple\')">🔊 試聽單字</button>' +
       '<button class="dev-btn" onclick="devTtsPreview(\'ttsSentenceVoice\',\'\')">🔊 試聽句子</button>' +
-      '<button class="dev-btn" onclick="devSaveTtsVoice()">💾 儲存</button>' +
     '</div>' +
+    '<div class="tts-auto">' +
+      '<label class="tts-auto-item"><input type="checkbox" id="ttsAutoOn"' + (autoOn ? ' checked' : '') + '> <b>新增/修改單字時自動產生音檔</b></label>' +
+      '<div class="tts-auto-list">自動產生這些聲音：' + checks + '</div>' +
+      '<small>雲端每月最多自動產生 20 萬字元（約 20 個聲音的全部單字），超過會停，不會多花錢。勾越多聲音，每個新字用的字元越多。</small>' +
+    '</div>' +
+    '<div class="tts-voice-btns"><button class="dev-btn" onclick="devSaveTtsVoice()">💾 儲存</button></div>' +
     '<small>單字和句子用不同聲音，孩子會聽到兩種人的發音。某個聲音沒有的字，會自動用其他聲音補上。</small>' +
   '</div>');
 }
@@ -289,10 +328,15 @@ async function devChooseTtsVoice() {
 async function devSaveTtsVoice() {
   var w = document.getElementById('ttsWordVoice').value;
   var s = document.getElementById('ttsSentenceVoice').value;
+  var auto = Array.from(document.querySelectorAll('.tts-auto-cb:checked')).map(function(c) { return c.value; });
   ttsManifest.wordVoice = w;
   ttsManifest.sentenceVoice = s;
+  ttsManifest.autoVoices = auto;
+  ttsManifest.autoEnabled = document.getElementById('ttsAutoOn').checked;
   await saveTtsManifest(ttsManifest);
-  devOut('✅ 已儲存：單字用 <b>' + esc(w) + '</b>、句子用 <b>' + esc(s) + '</b>。平板重新打開 App 就會套用。');
+  devOut('✅ 已儲存：單字用 <b>' + esc(w) + '</b>、句子用 <b>' + esc(s) + '</b>。' +
+    '<br>自動產生：' + (ttsManifest.autoEnabled ? (auto.length ? esc(auto.join('、')) : '（沒勾聲音，不會產生）') : '已關閉') +
+    '。平板重新打開 App 就會套用。');
 }
 
 // 試聽：用選單裡的聲音念一個這個聲音「有的」單字或例句
@@ -384,6 +428,8 @@ async function devDeleteTtsVoice() {
   }
   await Promise.all([worker(), worker(), worker(), worker()]);
   delete ttsManifest.voices[name];
+  ttsManifest._deleted = [name];   // 告訴 saveTtsManifest：這個聲音是刻意刪除的，不要從雲端合併回來
+  if (Array.isArray(ttsManifest.autoVoices)) ttsManifest.autoVoices = ttsManifest.autoVoices.filter(function(v) { return v !== name; });
   var rest = Object.keys(ttsManifest.voices);
   if (ttsManifest.wordVoice === name) ttsManifest.wordVoice = rest[0] || '';
   if (ttsManifest.sentenceVoice === name) ttsManifest.sentenceVoice = ttsManifest.wordVoice;
