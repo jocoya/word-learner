@@ -83,7 +83,7 @@ async function getGameWords(gameType) {
 var activeChallengeSession = null;
 var _resumeWordsOverride = null;
 var _resumingActiveChallenge = false;
-var RESUMABLE_GAMES = { fillblank: true, speak: true, detective: true, pattern: true };
+var RESUMABLE_GAMES = { fillblank: true, speak: true, detective: true, pattern: true, dictation: true };
 
 function newChallengeId() {
   return 'challenge-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
@@ -499,7 +499,7 @@ async function runDailyChallengeSession(session) {
         case 'listen':    renderMixListen(area, target, options, 'kid', onAnswer); break;
         case 'fillblank': renderMixFillblank(area, target, dueWords, onAnswer); break;
         case 'spelling':  renderMixSpelling(area, target, onAnswer); break;
-        case 'speak':     renderMixSpeak(area, target, onAnswer); break;
+        case 'speak':     renderMixSpeak(area, target, onAnswer, others); break;
         default:          onAnswer(true);
       }
     }
@@ -685,6 +685,8 @@ startGame = async function(gameId) {
       case 'color':     initHuntGame(area, words, 'color'); break;
       case 'phonics':   initPhonicsGame(area, words, currentMode); break;
       case 'pattern':   initPatternGame(area, words); break;
+      case 'dictation': initDictationGame(area, words); break;
+      case 'minimal':   initMinimalGame(area, words, currentMode); break;
     }
   });
 };

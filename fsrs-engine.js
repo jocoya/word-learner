@@ -251,12 +251,24 @@ function gameToRating(payload) {
     return 1;
   }
   if (gt === 'speak') {
-    // 看圖說句：依「有沒有講到目標字 + 句子完整度」評分
-    // payload.spokenWords = 說出的字數；有講到字 + 完整句子(>=3字) → Easy
-    if (m > 0) return 1; // 沒講到目標字
+    // 看圖問答：聽懂問題並用英文回答
+    // 自己答對 → Easy；看了「怎麼回答」提示才答對 → Good；兩次都沒答對 → Hard（有練到聽力，不當成忘記）
+    if (m > 0) return 2;
     if (isBaby) return 3;
-    var sw = payload.spokenWords || 0;
-    return sw >= 3 ? 4 : 3; // 完整句子給 Easy，只講單字/太短給 Good
+    return hint > 0 ? 3 : 4;
+  }
+
+  // 句子聽寫（dictation）：聽句子打出來，目標字拼對 = 主動回想 + 拼寫 → Easy；
+  // 句子有錯但目標字對 → Good；目標字拼錯 → Again
+  if (gt === 'dictation') {
+    if (m === 0) return 4;
+    if (m === 1) return 3;
+    return 1;
+  }
+
+  // 易混音辨識（minimal）：聽音辨字，一次對 → Good；錯過才對 → Hard
+  if (gt === 'minimal') {
+    return m === 0 ? 3 : 2;
   }
 
   // 簡單遊戲：最高只給 Good(3)，因為太容易、有猜的成分
@@ -398,7 +410,7 @@ var GAME_MIN_STABILITY = {
   bubble: 1,      // 泡泡戳戳樂 - 需要快速反應
   echo: 1,        // 魔法發音動物園 - 跟讀
   spelling: 3,    // 拼字挑戰 - 需要會拼（約熟悉期）
-  speak: 3,       // 看圖說句 - 需要會用
+  speak: 3,       // 看圖問答 - 聽懂問題並用英文回答
   fillblank: 8,   // 句子排列 - 需要情境理解（接近應用期）
   detective: 0,   // 線索偵探 - 雙模式：新字學習 + 熟字偵探（門檻 0 讓新字也能進來學）
   match: 0,       // 連連看 - 認字配對（最低）
@@ -415,7 +427,7 @@ var GAME_NAMES_ZH = {
   bubble: '泡泡戳戳樂',
   echo: '魔法發音動物園',
   spelling: '拼字挑戰',
-  speak: '看圖說句',
+  speak: '看圖問答',
   fillblank: '句子排列',
   detective: '線索偵探',
   match: '連連看',
@@ -424,7 +436,9 @@ var GAME_NAMES_ZH = {
   mimic: '動作模仿',
   color: '顏色尋寶',
   phonics: '拼讀小達人',
-  pattern: '仿造句子'
+  pattern: '仿造句子',
+  dictation: '句子聽寫',
+  minimal: '易混音辨識'
 };
 
 // 取得單字的當前 stability（沒有 progress 紀錄就回 0）— 依目前小孩

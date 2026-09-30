@@ -156,9 +156,12 @@ body {
 /* Game area */
 .game-area {
   flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+  align-items: center;
   padding: 16px; overflow-y: auto; background: #f0f4ff;
 }
+/* 垂直置中改用 margin:auto：內容放得下時置中；比畫面高時從頂部開始、可完整捲動
+   （原本 justify-content:center 在內容過高時，頂部會溢出到標題列下方且捲不回來） */
+.game-area > * { margin-top: auto; margin-bottom: auto; }
 .game-score { font-weight: 700; color: #FF9800; font-size: 1.1em; }
 
 /* Memory game */
@@ -2172,7 +2175,7 @@ body {
 .profile-card.hunt .profile-desc { color: #00695C; }
 
 /* ===== 家中尋寶遊戲 ===== */
-.hunt { max-width: 900px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.hunt { max-width: 900px; width: 100%; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
 .hunt-progress { color: #00838F; font-weight: 700; font-size: 1.1em; }
 .hunt-mission { background: #fff; border-radius: 24px; padding: 24px 48px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
 .hunt-label { color: #666; font-size: 1.2em; }
@@ -2571,7 +2574,7 @@ body {
 }
 
 /* ===== 拼讀小達人 ===== */
-.phon { max-width: 900px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.phon { max-width: 900px; width: 100%; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
 .phon-progress { color: #5E35B1; font-weight: 700; font-size: 1.1em; }
 .phon-prompt { font-size: 1.4em; color: #444; }
 .phon-pic { width: min(320px, 70vw); aspect-ratio: 1; border-radius: 24px; border: 4px solid #B39DDB; background: #F3E5F5; overflow: hidden; padding: 0; cursor: pointer; }
@@ -2609,7 +2612,7 @@ body {
 .moe-check { display: flex; align-items: center; gap: 6px; }
 
 /* ===== 仿造句子 ===== */
-.pat { max-width: 960px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center; }
+.pat { max-width: 960px; width: 100%; padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }
 .pat-progress { color: #00897B; font-weight: 700; font-size: 1.1em; }
 .pat-card { display: flex; gap: 16px; align-items: center; background: #fff; border-radius: 20px; padding: 12px 24px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
 .pat-img { width: 110px; height: 110px; object-fit: cover; border-radius: 14px; }
@@ -2638,3 +2641,63 @@ body {
 .pat-confirm-q { font-size: 1.15em; }
 .pat-feedback { min-height: 1.6em; font-size: 1.4em; }
 .pat-win { color: #2E7D32; font-weight: 700; }
+
+/* ===== 看圖問答 ===== */
+.qa { max-width: 900px; width: 100%; padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+.qa-progress { color: #3949AB; font-weight: 700; font-size: 1.1em; }
+.qa-img { width: min(300px, 60vw); max-height: 34vh; aspect-ratio: 1; object-fit: cover; border-radius: 22px; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+.qa-noimg { width: min(260px, 60vw); aspect-ratio: 1; border-radius: 22px; background: #E8EAF6; display: flex; align-items: center; justify-content: center; font-size: 1.8em; color: #3949AB; }
+.qa-bubble { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 22px; padding: 14px 24px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.qa-who { font-size: 1.6em; }
+.qa-q { font-size: 2em; font-weight: 700; color: #283593; }
+.qa-qzh { color: #888; font-size: 1.1em; }
+.qa-mini { border: none; background: none; font-size: 1.4em; cursor: pointer; }
+.qa-answer { min-height: 1.6em; font-size: 1.5em; color: #333; }
+.qa-hint { background: #FFFDE7; border-radius: 14px; padding: 10px 18px; font-size: 1.2em; }
+.qa-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.qa-mic { padding: 16px 40px; border-radius: 22px; border: none; background: linear-gradient(135deg, #5C6BC0, #3949AB); color: #fff; font-size: 1.4em; font-weight: 700; cursor: pointer; }
+.qa-mic.recording { background: #E53935; }
+.qa-actions .btn-sm { font-size: 1.05em; padding: 12px 18px; }
+.qa-choice { padding: 14px 24px; font-size: 1.3em; border-radius: 16px; border: 3px solid #C5CAE9; background: #fff; cursor: pointer; }
+.qa-choice.correct { background: #E8F5E9; border-color: #43A047; }
+.qa-choice.wrong { background: #FFEBEE; border-color: #E57373; }
+.qa-feedback { min-height: 1.6em; font-size: 1.4em; }
+.qa-win { color: #2E7D32; font-weight: 700; }
+.qa-try { color: #E65100; }
+
+/* ===== 句子聽寫 ===== */
+.dict { max-width: 900px; width: 100%; padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+.dict-progress { color: #00695C; font-weight: 700; font-size: 1.1em; }
+.dict-prompt { font-size: 1.4em; color: #444; }
+.dict-play { display: flex; gap: 12px; align-items: center; }
+.dict-speak { padding: 16px 40px; border-radius: 22px; border: none; background: linear-gradient(135deg, #26A69A, #00695C); color: #fff; font-size: 1.4em; font-weight: 700; cursor: pointer; }
+.dict-play .btn-sm, .dict-help .btn-sm { font-size: 1.05em; padding: 12px 18px; }
+.dict-plays { color: #999; min-height: 1.2em; }
+.dict-help { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.dict-hint-word { font-size: 1.3em; font-weight: 700; color: #F57F17; }
+.dict-input { width: min(760px, 94vw); font-size: 1.6em; padding: 14px 18px; border-radius: 14px; border: 3px solid #B2DFDB; }
+.dict-input:focus { outline: none; border-color: #00695C; }
+.dict-result { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.dict-msg { font-size: 1.4em; font-weight: 700; }
+.dict-answer { font-size: 1.8em; line-height: 1.6; }
+.dict-ok { color: #2E7D32; }
+.dict-miss { color: #C62828; background: #FFEBEE; border-bottom: 3px solid #C62828; border-radius: 4px; padding: 0 4px; }
+.dict-yours { color: #888; font-size: 1.1em; }
+
+/* ===== 易混音辨識 ===== */
+.mp { max-width: 900px; width: 100%; padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 16px; align-items: center; text-align: center; }
+.mp-progress { color: #AD1457; font-weight: 700; font-size: 1.1em; }
+.mp-cat { font-size: .8em; background: #FCE4EC; color: #AD1457; border-radius: 10px; padding: 2px 10px; margin-left: 6px; }
+.mp-speak { width: 120px; height: 120px; border-radius: 50%; border: none; background: linear-gradient(135deg, #EC407A, #AD1457); color: #fff; font-size: 3em; cursor: pointer; box-shadow: 0 6px 18px rgba(173,20,87,.3); }
+.mp-prompt { font-size: 1.4em; color: #444; }
+.mp-opts { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+.mp-opt { width: 220px; padding: 20px 12px; border-radius: 24px; border: 4px solid #F8BBD0; background: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.mp-opt.correct { background: #E8F5E9; border-color: #43A047; }
+.mp-opt.wrong { background: #FFEBEE; border-color: #E57373; opacity: .6; }
+.mp-emoji { font-size: 4.5em; line-height: 1.1; }
+.mp-word { font-size: 2em; font-weight: 800; color: #333; }
+.mp-zh { font-size: 1.2em; color: #888; }
+.mp-compare { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 1.1em; color: #666; }
+.mp-compare .btn-sm { font-size: 1.1em; padding: 10px 18px; }
+.mp-feedback { min-height: 1.6em; font-size: 1.5em; }
+.mp-win { color: #2E7D32; font-weight: 700; }

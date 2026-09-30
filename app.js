@@ -80,7 +80,9 @@ const GAMES = [
   { id: 'fillblank', icon: '📝', name: '句子排列',   desc: '把單字排成正確句子',  modes: ['kid'] },
   { id: 'spelling',  icon: '🔤', name: '拼字挑戰',   desc: '拼出正確的單字',     modes: ['kid'] },
   { id: 'pattern',   icon: '💬', name: '仿造句子',   desc: '照句型說自己的句子並寫下來', modes: ['kid'] },
-  { id: 'speak',     icon: '🎤', name: '看圖說句',   desc: '看圖說出句子',       modes: ['kid'] },
+  { id: 'dictation', icon: '✍️', name: '句子聽寫',   desc: '聽句子、把整句打出來',     modes: ['kid'] },
+  { id: 'minimal',   icon: '👂', name: '易混音辨識', desc: 'ship 還是 sheep？仔細聽',  modes: ['baby','kid'] },
+  { id: 'speak',     icon: '🎤', name: '看圖問答',   desc: '聽問題、用英文回答',   modes: ['kid'] },
   { id: 'detective', icon: '🔍', name: '線索偵探',   desc: '認識新字＋聽線索猜字',  modes: ['kid'] },
   { id: 'match',     icon: '🔗', name: '連連看',     desc: '英文連中文',         modes: ['kid'] },
   { id: 'cloze',     icon: '📖', name: '讀句選字',   desc: '讀句子選出單字',     modes: ['kid'] },
@@ -1756,7 +1758,12 @@ function renderMixFillblank(area, target, words, cb) {
 }
 
 // 單題看圖說句（語音，不呼叫 updateProgress / showResult）
-function renderMixSpeak(area, target, cb) {
+function renderMixSpeak(area, target, cb, others) {
+  // 看圖問答（games/speak.js）：每日挑戰也改用「聽問題 → 回答」
+  if (typeof renderSpeakQA === 'function') {
+    renderSpeakQA(area, target, others || [], cb, '');
+    return;
+  }
   var supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
   var img = getRandomImage(target);
   var sentence = (typeof getRandomSentence === 'function') ? getRandomSentence(target) : null;
