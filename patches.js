@@ -664,9 +664,21 @@ startGame = async function(gameId) {
       case 'match':     initMatchGame(area, words); break;
       case 'cloze':     initClozeGame(area, words); break;
       case 'write':     initWriteGame(area, words); break;
+      case 'hunt':      initHuntGame(area, words); break;
     }
   });
 };
+
+// 首頁大卡片：直接開始家中尋寶（用永久庫單字）
+async function startHomeHunt() {
+  currentMode = 'kid';
+  dailyRole = null;
+  var src = document.getElementById('gameSource');
+  if (src) src.value = 'permanent';
+  var tag = document.getElementById('gameTagFilter');
+  if (tag) tag.value = 'all';
+  await startGame('hunt');
+}
 
 // ===== FSRS 整合的多巴胺系統 =====
 // 同一場挑戰的連擊計數

@@ -39,6 +39,8 @@ async function cloudScan() {
     var usedUrls = {};
     words.forEach(function(w) {
       (getAllImages(w) || []).forEach(function(u) { if (u) usedUrls[u] = true; });
+      // 家中尋寶的照片另存在 huntPhotos，也算「使用中」，避免被當孤兒刪掉
+      (w.huntPhotos || []).forEach(function(u) { if (u) usedUrls[u] = true; });
     });
 
     var listRef = storage.ref('word_images');

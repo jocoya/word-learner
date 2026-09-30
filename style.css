@@ -2159,6 +2159,45 @@ body {
 }
 .profile-card.learn .profile-name { color: #E65100; }
 
+/* ===== 首頁「家中尋寶」卡片 ===== */
+.profile-card.hunt {
+  background: linear-gradient(135deg, #E0F7FA, #B2EBF2);
+  border: 3px solid #4DD0E1;
+}
+.profile-card.hunt .profile-name { color: #00838F; }
+.profile-card.hunt .profile-desc { color: #00695C; }
+
+/* ===== 家中尋寶遊戲 ===== */
+.hunt { max-width: 900px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.hunt-progress { color: #00838F; font-weight: 700; font-size: 1.1em; }
+.hunt-mission { background: #fff; border-radius: 24px; padding: 24px 48px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.hunt-label { color: #666; font-size: 1.2em; }
+.hunt-word { font-size: 4.5em; font-weight: 800; color: #00838F; letter-spacing: 2px; line-height: 1.2; }
+.hunt-speak { margin-top: 8px; padding: 10px 20px; border-radius: 20px; border: 2px solid #4DD0E1; background: #E0F7FA; font-size: 1.1em; cursor: pointer; }
+.hunt-hint { background: #FFFDE7; border-radius: 16px; padding: 12px 20px; }
+.hunt-hint-zh { font-size: 1.5em; font-weight: 700; color: #F57F17; }
+.hunt-hint img { max-width: 220px; max-height: 220px; border-radius: 12px; margin-top: 8px; object-fit: cover; }
+.hunt-photo img { max-width: min(480px, 90vw); max-height: 45vh; border-radius: 20px; border: 4px solid #4DD0E1; object-fit: cover; }
+.hunt-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; }
+.hunt-actions .btn-sm { font-size: 1em; padding: 10px 16px; }
+.hunt-camera { display: inline-flex; align-items: center; padding: 18px 36px; border-radius: 20px; background: linear-gradient(135deg, #00ACC1, #00838F); color: #fff; font-size: 1.4em; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(0,131,143,.35); }
+.hunt-camera:active { transform: scale(.96); }
+.hunt-confirm { background: #fff; border-radius: 16px; padding: 16px 24px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.hunt-confirm-q { font-size: 1.2em; margin-bottom: 12px; }
+.hunt-confirm-btns { display: flex; gap: 12px; justify-content: center; }
+.hunt-confirm-btns .btn-sm { font-size: 1.1em; padding: 12px 24px; }
+.hunt-feedback { min-height: 1.6em; font-size: 1.4em; }
+.hunt-win { color: #2E7D32; font-weight: 700; }
+.hunt-skip { color: #888; }
+.hunt-saved { font-size: .7em; color: #00838F; margin-top: 6px; }
+.hunt-memory { font-size: .7em; color: #666; margin-top: 10px; }
+.hunt-memory img { display: block; margin: 6px auto 0; max-width: 200px; max-height: 200px; border-radius: 14px; border: 3px solid #4DD0E1; object-fit: cover; }
+/* 動作任務：橘色系；顏色/特徵任務：紫色系 */
+.hunt-act .hunt-word, .hunt-act .hunt-progress { color: #E65100; }
+.hunt-act .hunt-camera { background: linear-gradient(135deg, #FB8C00, #E65100); border: none; box-shadow: 0 4px 12px rgba(230,81,0,.35); }
+.hunt-look .hunt-word, .hunt-look .hunt-progress { color: #6A1B9A; }
+.hunt-look .hunt-camera { background: linear-gradient(135deg, #8E24AA, #6A1B9A); box-shadow: 0 4px 12px rgba(106,27,154,.35); }
+
 
 /* ===== 學習地圖（Atlas）===== */
 .atlas-enter-btn {
@@ -2433,4 +2472,56 @@ body {
 
 @media (min-width: 1000px) {
   .write-box { width: 120px; height: 150px; }
+}
+
+/* ===== 故事專區 ===== */
+.story-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; max-width: 1400px; width: 100%; margin: 0 auto; }
+.story-panel { background: #fff; border-radius: 16px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.story-panel h3 { margin: 0 0 12px; }
+.story-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+.story-row select { padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; min-width: 200px; }
+.story-count { font-size: .9em; color: #666; }
+.story-hint { color: #999; font-size: .9em; margin: 6px 0; }
+.story-progress { font-weight: 600; color: #667eea; min-height: 1.4em; margin: 8px 0; white-space: pre-line; }
+.story-start { text-align: center; background: linear-gradient(135deg, #283593, #5C6BC0); color: #fff; }
+.story-start .story-hint { color: rgba(255,255,255,.85); }
+.story-start .story-progress { color: #FFF59D; }
+.story-big-btn {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 24px 56px; border-radius: 24px; border: 3px solid #FFF59D;
+  background: rgba(255,255,255,.12); color: #fff; font-size: 1.6em; font-weight: 700; cursor: pointer;
+  transition: transform .2s;
+}
+.story-big-btn:active { transform: scale(.95); }
+.story-big-btn:disabled { opacity: .6; cursor: wait; }
+.story-big-icon { font-size: 1.8em; }
+.story-sub { color: #888; font-size: .95em; }
+.story-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; }
+.story-book { display: flex; gap: 8px; align-items: center; background: #f5f6ff; border-radius: 12px; padding: 8px; }
+.story-book-main { flex: 1; display: flex; gap: 12px; align-items: center; background: none; border: none; text-align: left; cursor: pointer; padding: 6px; min-width: 0; }
+.story-book-icon { font-size: 2.4em; }
+.story-book-info { display: flex; flex-direction: column; min-width: 0; }
+.story-book-title { font-weight: 700; font-size: 1.1em; color: #333; }
+.story-book-meta { color: #999; font-size: .85em; margin-top: 2px; }
+.story-reader { flex: 1; display: flex; gap: 24px; padding: 20px; align-items: center; justify-content: center; }
+.story-reader-img-wrap { flex: 1; max-width: 62vh; display: flex; flex-direction: column; gap: 10px; }
+.story-reader-pic { width: 100%; aspect-ratio: 1; padding: 0; border: 4px solid #FFF59D; border-radius: 24px; overflow: hidden; cursor: pointer; background: #eee; box-shadow: 0 6px 24px rgba(0,0,0,.15); }
+.story-reader-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.story-pic-pop { animation: storyPop .5s ease; }
+@keyframes storyPop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+.story-tap-ask { text-align: center; font-size: 1.3em; color: #5C6BC0; }
+.story-reader-noimg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 4em; color: #999; }
+.story-reader-text { flex: 1; max-width: 640px; display: flex; flex-direction: column; gap: 16px; }
+.story-reader-en { font-size: 2em; line-height: 1.5; font-weight: 600; color: #333; }
+.story-reader-en mark { background: #FFF176; border-radius: 6px; padding: 0 4px; }
+.story-reader-zh { font-size: 1.3em; color: #777; line-height: 1.5; }
+.story-zh-hidden { visibility: hidden; }
+.story-reader-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.story-reader-controls .btn-sm { font-size: 1em; padding: 10px 16px; }
+.story-reader-page { font-weight: 700; color: #667eea; min-width: 60px; text-align: center; }
+.story-rate { display: flex; align-items: center; gap: 6px; color: #666; }
+@media (max-width: 900px) {
+  .story-reader { flex-direction: column; }
+  .story-reader-en { font-size: 1.5em; }
+  .story-list { grid-template-columns: 1fr; }
 }

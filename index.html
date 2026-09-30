@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>英文單字學習樂園</title>
-  <link rel="stylesheet" href="style.css?v=64" />
+  <link rel="stylesheet" href="style.css?v=65" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#4A90D9" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -41,18 +41,84 @@
           <div class="profile-name">認識新朋友</div>
           <div class="profile-desc">家長陪讀 · 5 個新單字</div>
         </button>
+        <button class="profile-card hunt" onclick="startHomeHunt()">
+          <div class="profile-icon" style="font-size:48px;line-height:56px;">🏠</div>
+          <div class="profile-name">家中尋寶</div>
+          <div class="profile-desc">聽單字 · 找到它拍下來</div>
+        </button>
       </div>
       <button class="btn-manage" onclick="goTo('page-manage')">⚙️ 管理單字</button>
       <button class="btn-manage" onclick="goTo('page-exams')">📝 考試複習包</button>
       <button class="btn-manage" onclick="startDailyChallenge()">🔥 每日挑戰</button>
       <button class="btn-manage" onclick="goTo('page-coins')">🪙 金幣庫</button>
       <button class="btn-manage" onclick="goTo('page-report')">📊 學習報告</button>
+      <button class="btn-manage" onclick="openStoryZone()">🌙 睡前故事</button>
       <div class="home-tools">
         <button class="home-tool-btn" onclick="appUpdate()">🔄 更新</button>
         <button class="home-tool-btn" onclick="appClearCache()">🗑️ 清除快取</button>
       </div>
     </div>
-    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v64</div>
+    <div class="app-version" id="appVersion" onclick="if(typeof devTapVersion==='function')devTapVersion()">v65</div>
+  </div>
+
+  <!-- 故事專區 -->
+  <div id="page-stories" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>🌙 睡前故事</h2>
+      <div class="top-actions">
+        <button class="btn-sm" onclick="openAISettings()">⚙️ AI 設定</button>
+      </div>
+    </div>
+    <div class="story-body">
+      <section class="story-panel story-start">
+        <button class="story-big-btn" id="storyGenerateBtn" onclick="startBedtimeStory()">
+          <span class="story-big-icon">📖</span>
+          <span>今天的故事</span>
+        </button>
+        <p class="story-hint">自動用今天學過、該複習的單字寫一個 5 頁小故事（需要電腦上的 AI 開著，約十幾秒）。</p>
+        <div class="story-progress" id="storyProgress" role="status" aria-live="polite"></div>
+      </section>
+      <section class="story-panel">
+        <h3>📚 故事書架</h3>
+        <div class="story-list" id="storyList"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- 故事閱讀器 -->
+  <div id="page-story-reader" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="closeStoryReader()">← 返回</button>
+      <h2 id="storyReaderTitle">故事</h2>
+    </div>
+    <div class="story-reader">
+      <div class="story-reader-img-wrap">
+        <button class="story-reader-pic" id="storyReaderPic" onclick="storyTapPicture()" aria-label="點圖片"></button>
+        <div class="story-tap-ask" id="storyTapAsk" hidden></div>
+      </div>
+      <div class="story-reader-text">
+        <div class="story-reader-en" id="storyReaderEn"></div>
+        <div class="story-reader-zh" id="storyReaderZh"></div>
+        <div class="story-reader-controls">
+          <button class="btn-sm" id="storyPrevBtn" onclick="storyGoPage(-1)" aria-label="上一頁">◀ 上一頁</button>
+          <span class="story-reader-page" id="storyReaderPage"></span>
+          <button class="btn-sm" id="storyNextBtn" onclick="storyGoPage(1)" aria-label="下一頁">下一頁 ▶</button>
+        </div>
+        <div class="story-reader-controls">
+          <button class="btn-sm btn-green" onclick="readStoryPage()">🔊 念這頁</button>
+          <button class="btn-sm btn-green" id="storyAutoBtn" onclick="toggleStoryAutoRead()">▶️ 一路念下去</button>
+          <button class="btn-sm" onclick="toggleStoryZh()">中文 顯示/隱藏</button>
+          <label class="story-rate">速度
+            <select id="storyRate">
+              <option value="0.6">慢</option>
+              <option value="0.75" selected>中</option>
+              <option value="0.95">正常</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 遊戲選擇頁 -->
@@ -491,32 +557,34 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-  <script src="db.js?v=64"></script>
-  <script src="fsrs-engine.js?v=64"></script>
-  <script src="ai.js?v=64"></script>
-  <script src="imagegen.js?v=64"></script>
-  <script src="games/memory.js?v=64"></script>
-  <script src="games/listen.js?v=64"></script>
-  <script src="games/fillblank.js?v=64"></script>
-  <script src="games/spelling.js?v=64"></script>
-  <script src="games/speak.js?v=64"></script>
-  <script src="games/bubble.js?v=64"></script>
-  <script src="games/echo.js?v=64"></script>
-  <script src="games/flashlight.js?v=64"></script>
-  <script src="games/detective.js?v=64"></script>
-  <script src="games/match.js?v=64"></script>
-  <script src="games/cloze.js?v=64"></script>
-  <script src="games/learn.js?v=64"></script>
-  <script src="games/atlas.js?v=64"></script>
-  <script src="games/write.js?v=64"></script>
-  <script src="app.js?v=64"></script>
-  <script src="coins.js?v=64"></script>
-  <script src="dev.js?v=64"></script>
-  <script src="cloud.js?v=64"></script>
-  <script src="patches.js?v=64"></script>
-  <script src="monster.js?v=64"></script>
+  <script src="db.js?v=65"></script>
+  <script src="fsrs-engine.js?v=65"></script>
+  <script src="ai.js?v=65"></script>
+  <script src="imagegen.js?v=65"></script>
+  <script src="games/memory.js?v=65"></script>
+  <script src="games/listen.js?v=65"></script>
+  <script src="games/fillblank.js?v=65"></script>
+  <script src="games/spelling.js?v=65"></script>
+  <script src="games/speak.js?v=65"></script>
+  <script src="games/bubble.js?v=65"></script>
+  <script src="games/echo.js?v=65"></script>
+  <script src="games/flashlight.js?v=65"></script>
+  <script src="games/detective.js?v=65"></script>
+  <script src="games/match.js?v=65"></script>
+  <script src="games/cloze.js?v=65"></script>
+  <script src="games/learn.js?v=65"></script>
+  <script src="games/atlas.js?v=65"></script>
+  <script src="games/write.js?v=65"></script>
+  <script src="games/hunt.js?v=65"></script>
+  <script src="app.js?v=65"></script>
+  <script src="coins.js?v=65"></script>
+  <script src="dev.js?v=65"></script>
+  <script src="cloud.js?v=65"></script>
+  <script src="patches.js?v=65"></script>
+  <script src="stories.js?v=65"></script>
+  <script src="monster.js?v=65"></script>
   <script>
-    var APP_VERSION = 'v64';
+    var APP_VERSION = 'v65';
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
       // 接收 service worker 回傳的版本號

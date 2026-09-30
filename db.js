@@ -77,7 +77,7 @@ function uploadViaCanvas(url, word) {
 
 // ===== IndexedDB（離線快取，保持相容）=====
 var DB_NAME = 'WordLearnerDB';
-var DB_VERSION = 1;
+var DB_VERSION = 2; // v2：新增 stories（故事專區，本機儲存）
 var db = null;
 
 function openDB() {
@@ -98,9 +98,18 @@ function openDB() {
       }
       if (!d.objectStoreNames.contains('settings'))
         d.createObjectStore('settings', { keyPath: 'key' });
+      // 故事書：含圖片 Blob，只存本機、不同步 Firestore
+      if (!d.objectStoreNames.contains('stories'))
+        d.createObjectStore('stories', { keyPath: 'id' });
     };
-    req.onsuccess = function(e) { db = e.target.result; resolve(db); };
+    req.onsuccess = function(e) {
+      db = e.target.result;
+      // 其他分頁要升級 DB 版本時，關閉舊連線讓升級能進行
+      db.onversionchange = function() { db.close(); db = null; };
+      resolve(db);
+    };
     req.onerror = function(e) { reject(e.target.error); };
+    req.onblocked = function() { console.warn('IndexedDB 升級被其他分頁阻擋，請關閉其他分頁'); };
   });
 }
 
@@ -126,6 +135,17 @@ async function dbAdd(store, data) {
     tx2.objectStore(store).put(data);
   } catch (e) { console.warn('Firestore sync failed:', e); }
   return localId;
+}
+
+// 僅刪除本機 IndexedDB 資料（不動 Firestore），故事書等本機專用資料使用。
+async function dbDeleteLocal(store, id) {
+  var d = await openDB();
+  return new Promise(function(resolve, reject) {
+    var tx = d.transaction(store, 'readwrite');
+    var req = tx.objectStore(store).delete(id);
+    req.onsuccess = function() { resolve(); };
+    req.onerror = function() { reject(req.error); };
+  });
 }
 
 // 僅更新本機 IndexedDB（不送 Firestore）。

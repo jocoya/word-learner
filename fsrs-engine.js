@@ -201,6 +201,17 @@ function gameToRating(payload) {
     return m > 0 ? 1 : 3;
   }
 
+  // 家中尋寶（hunt）：聽到英文就找到真實物品 → Good(3)；看了中文/圖片提示才找到 → Hard(2)
+  // 「家裡沒有」不會呼叫這裡，不扣分
+  if (gt === 'hunt') {
+    return hint > 0 ? 2 : 3;
+  }
+
+  // 睡前故事（story）：聽故事時點出重點字圖片，屬於輕度接觸 → 只給 Hard(2)，維持記憶但不推升太快
+  if (gt === 'story') {
+    return 2;
+  }
+
   // 手寫單字（write）：完整寫出整個單字 → 很有效的記憶，給 Easy(4)
   if (gt === 'write') {
     return m > 0 ? 2 : 4;

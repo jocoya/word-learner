@@ -93,6 +93,7 @@ async function _ollamaChat(cfg, prompt, options) {
       model: cfg.ollamaModel,
       prompt: fullPrompt,
       stream: false,
+      format: options.json ? 'json' : undefined, // 需要結構化輸出時要求 Ollama 回 JSON
       options: { temperature: options.temperature != null ? options.temperature : 0.7 }
     })
   }, options.timeout || 60000);
@@ -119,6 +120,7 @@ async function _openAIChat(url, model, prompt, options) {
       temperature: options.temperature != null ? options.temperature : 0.7,
       max_tokens: options.maxTokens || 512,
       stream: false
+      // 註：不送 response_format，部分 LM Studio 模型不支援；由 prompt 要求 JSON 並在前端解析
     })
   }, options.timeout || 60000);
   if (!res.ok) {
