@@ -1,17 +1,22 @@
-// ===== 語音播放（Sulafat 音檔優先，沒有就用瀏覽器語音）=====
-// 音檔由電腦端 tools/tts/generate.js 產生，再用「開發者模式 → 🎙️ 匯入語音包」上傳到 Storage：
-//   tts/manifest.json      ：{ voice, items: { key: {text, kind, bytes} } }
-//   tts/audio/<key>.mp3    ：key = sha1(正規化文字) 前 16 碼（與 generate.js 相同算法）
-// 啟動時讀一次 manifest（之後由 Service Worker 快取，離線也能播）。
+// ===== 語音播放（雲端音檔優先，沒有就用瀏覽器語音）=====
+// 支援多個聲音包，每個聲音一個資料夾：
+//   Storage  tts/<聲音>/<key>.mp3          ：key = sha1(正規化文字) 前 16 碼（與 tools/tts/generate.js 相同算法）
+//            （舊版 v69 的 Sulafat 在 tts/audio/<key>.mp3，仍然可以播放）
+//   settings ttsManifest = {
+//     voices: { Sulafat: { folder:'audio', items:{ key:'w'|'s' } }, Achird: { folder:'Achird', items:{...} } },
+//     wordVoice: 'Achird',        // 念單字用哪個聲音
+//     sentenceVoice: 'Achird'     // 念例句 / 句子用哪個聲音（可和單字不同，增加豐富性）
+//   }
+// 選的聲音沒有這句 → 退回其他有這句的聲音 → 最後才用瀏覽器語音。
 // 所有發音都走 speakWord()，所以遊戲程式不用改。
 
 var TTS_STORAGE_DIR = 'tts';
-var ttsManifest = null;         // { voice, items }
+var TTS_SETTINGS_KEY = 'ttsManifest';
+var ttsManifest = null;
 var ttsReady = false;
-var ttsAudioBase = null;        // Storage 下載網址前綴（取得一次即可組出所有 mp3 網址）
 var _ttsCurrent = null;         // 正在播放的 Audio
 var _ttsSeq = 0;                // 每次 speak 遞增：新的一次會中斷舊的
-var _ttsUrlCache = {};          // key → 下載網址
+var _ttsUrlCache = {};          // 'Voice/key' → 下載網址
 
 // 與 generate.js 完全相同的正規化
 function ttsNormalize(text) {
@@ -25,25 +30,86 @@ async function ttsKey(text) {
   return Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('').slice(0, 16);
 }
 
-// 讀取 manifest（失敗就維持瀏覽器語音，不影響使用）
-async function loadTtsManifest() {
-  if (typeof storage === 'undefined') return;
-  try {
-    var url = await storage.ref(TTS_STORAGE_DIR + '/manifest.json').getDownloadURL();
-    var res = await fetch(url);
-    if (!res.ok) return;
-    ttsManifest = await res.json();
-    ttsReady = !!(ttsManifest && ttsManifest.items);
-  } catch (e) {
-    // 還沒上傳語音包是正常情況
-    ttsReady = false;
-  }
+// en-US-Chirp3-HD-Achird → Achird
+function ttsVoiceShort(voice) {
+  var m = String(voice || '').match(/([A-Za-z]+)$/);
+  return m ? m[1] : 'voice';
 }
 
-async function ttsAudioUrl(key) {
-  if (_ttsUrlCache[key]) return _ttsUrlCache[key];
-  var url = await storage.ref(TTS_STORAGE_DIR + '/audio/' + key + '.mp3').getDownloadURL();
-  _ttsUrlCache[key] = url;
+// 舊格式（v69/v70：{ voice, items }）→ 新格式（多聲音）
+function ttsUpgradeManifest(s) {
+  if (!s) return null;
+  if (s.voices) return s;
+  if (!s.items) return null;
+  var name = ttsVoiceShort(s.voice || 'Sulafat');
+  var voices = {};
+  voices[name] = { folder: 'audio', items: s.items };   // 舊版音檔放在 tts/audio/
+  return { key: TTS_SETTINGS_KEY, voices: voices, wordVoice: name, sentenceVoice: name, updatedAt: s.updatedAt || Date.now() };
+}
+
+// 語音清單存在 settings（跟著 IndexedDB + Firestore 同步，離線可讀，不受 Storage CORS 限制）
+async function loadTtsManifest() {
+  try {
+    var s = (typeof dbGet === 'function') ? await dbGet('settings', TTS_SETTINGS_KEY) : null;
+    if (!s && typeof firestore !== 'undefined' && navigator.onLine) {
+      var doc = await firestore.collection('settings').doc(TTS_SETTINGS_KEY).get();
+      if (doc.exists) {
+        s = doc.data();
+        if (typeof dbPutLocal === 'function') await dbPutLocal('settings', s);
+      }
+    }
+    ttsManifest = ttsUpgradeManifest(s);
+    ttsReady = !!ttsManifest && Object.keys(ttsManifest.voices).some(function(v) {
+      return Object.keys(ttsManifest.voices[v].items || {}).length > 0;
+    });
+  } catch (e) {
+    ttsReady = false;
+  }
+  return ttsReady;
+}
+
+async function saveTtsManifest(m) {
+  m.key = TTS_SETTINGS_KEY;
+  m.updatedAt = Date.now();
+  await dbPut('settings', m);
+  ttsManifest = m;
+  ttsReady = Object.keys(m.voices).some(function(v) { return Object.keys(m.voices[v].items || {}).length > 0; });
+}
+
+// 是句子還是單字：依清單記錄的種類（ice cream 是單字，不能用「有沒有空白」判斷）
+// 清單裡都沒有這句（例如睡前故事的新句子）→ 用字數判斷
+function ttsIsSentence(key, text) {
+  var vs = ttsManifest ? ttsManifest.voices : {};
+  for (var n in vs) { var k = vs[n].items && vs[n].items[key]; if (k) return k === 's'; }
+  return String(text).trim().split(/\s+/).length > 2;
+}
+
+// 找這段文字要用哪個聲音：偏好的聲音有就用，沒有就找其他有這句的聲音
+function ttsPickVoice(key, isSentence) {
+  if (!ttsManifest) return null;
+  var prefer = isSentence ? ttsManifest.sentenceVoice : ttsManifest.wordVoice;
+  var order = [prefer].concat(Object.keys(ttsManifest.voices).filter(function(v) { return v !== prefer; }));
+  for (var i = 0; i < order.length; i++) {
+    var v = ttsManifest.voices[order[i]];
+    if (v && v.items && v.items[key]) return order[i];
+  }
+  return null;
+}
+
+// 音檔網址：getDownloadURL（含存取 token，不受 Storage 規則與 CORS 影響）
+// 取得過的網址存在 localStorage，下次開 App 不用再問、離線也能交給 Service Worker 快取播放
+var TTS_URL_LS = 'ttsUrlCache2';
+try { _ttsUrlCache = JSON.parse(localStorage.getItem(TTS_URL_LS) || '{}'); } catch (e) { _ttsUrlCache = {}; }
+function saveTtsUrlCache() {
+  try { localStorage.setItem(TTS_URL_LS, JSON.stringify(_ttsUrlCache)); } catch (e) {}
+}
+async function ttsAudioUrl(voice, key) {
+  var ck = voice + '/' + key;
+  if (_ttsUrlCache[ck]) return _ttsUrlCache[ck];
+  var folder = (ttsManifest.voices[voice] && ttsManifest.voices[voice].folder) || voice;
+  var url = await storage.ref(TTS_STORAGE_DIR + '/' + folder + '/' + key + '.mp3').getDownloadURL();
+  _ttsUrlCache[ck] = url;
+  saveTtsUrlCache();
   return url;
 }
 
@@ -77,8 +143,9 @@ function speakText(text, rate, onDone) {
 
   ttsKey(text).then(function(key) {
     if (seq !== _ttsSeq) return;                         // 已經有新的發音要求
-    if (!ttsManifest.items[key]) { speakBrowser(text, rate, onDone); return; }
-    return ttsAudioUrl(key).then(function(url) {
+    var voice = ttsPickVoice(key, ttsIsSentence(key, text));
+    if (!voice) { speakBrowser(text, rate, onDone); return; }
+    return ttsAudioUrl(voice, key).then(function(url) {
       if (seq !== _ttsSeq) return;
       var a = new Audio(url);
       // 瀏覽器語音 0.8 ≈ 正常；音檔本身已是 0.9 倍速，所以 0.8 → 1.0 播放
@@ -88,7 +155,11 @@ function speakText(text, rate, onDone) {
       var finished = false;
       var done = function() { if (finished) return; finished = true; if (_ttsCurrent === a) _ttsCurrent = null; if (onDone) onDone(); };
       a.onended = done;
-      a.onerror = function() { if (seq === _ttsSeq) { finished = true; speakBrowser(text, rate, onDone); } };
+      a.onerror = function() {
+        // 網址失效（例如檔案重傳後 token 改變）→ 清掉這筆，下次重新取得；這次先用瀏覽器語音
+        delete _ttsUrlCache[voice + '/' + key]; saveTtsUrlCache();
+        if (seq === _ttsSeq) { finished = true; speakBrowser(text, rate, onDone); }
+      };
       var p = a.play();
       if (p && p.catch) p.catch(function() { if (seq === _ttsSeq && !finished) { finished = true; speakBrowser(text, rate, onDone); } });
     });
@@ -102,87 +173,247 @@ function speakWord(word, rate) {
   speakText(word, rate === undefined ? 0.8 : rate);
 }
 
+// 清單只存種類，縮小 Firestore 文件（1 MB 上限；每筆約 25 bytes）
+function ttsShortItem(item) {
+  return item && item.kind === 'sentence' ? 's' : 'w';
+}
+
+// 列出 Storage 上某個資料夾已有的 mp3（listAll 是 Storage API，不受 CORS 影響）
+async function ttsFilesInStorage(folder) {
+  var map = {};
+  try {
+    var res = await storage.ref(TTS_STORAGE_DIR + '/' + folder).listAll();
+    res.items.forEach(function(it) { map[it.name.replace(/\.mp3$/i, '')] = true; });
+  } catch (e) { /* 列不到就全部重傳 */ }
+  return map;
+}
+
+function ttsEmptyManifest() {
+  return { key: TTS_SETTINGS_KEY, voices: {}, wordVoice: '', sentenceVoice: '' };
+}
+
 // ---------- 開發者模式：匯入語音包 ----------
-// 直接選 tools/tts/output「資料夾」（會一併讀到 manifest.json 與 audio/*.mp3）
-// 只上傳 Storage 上還沒有的檔案；最後合併並上傳 manifest
+// 選 tools/tts/output/<聲音名> 資料夾（會一併讀到 manifest.json 與 audio/*.mp3）
+// 上傳到 tts/<聲音名>/；已在雲端的跳過。第一次匯入的聲音會自動設為目前使用的聲音。
 async function devImportTtsPack() {
   var input = document.createElement('input');
   input.type = 'file';
   input.multiple = true;
-  // 選資料夾：Chrome / Edge / 平板 Chrome 都支援；不支援的瀏覽器會退回一般多選
   input.webkitdirectory = true;
   input.setAttribute('webkitdirectory', '');
   input.onchange = async function() {
     var files = Array.from(input.files || []);
     var manifestFile = files.find(function(f) { return f.name === 'manifest.json'; });
     var mp3s = files.filter(function(f) { return /\.mp3$/i.test(f.name); });
-    if (!manifestFile) { devOut('❌ 找不到 manifest.json。請選 tools\\tts\\output 這個資料夾（不是裡面的 audio 資料夾）。'); return; }
+    if (!manifestFile) { devOut('❌ 找不到 manifest.json。請選 tools\\tts\\output 裡面「聲音名稱」的資料夾（例如 Achird）。'); return; }
     if (!mp3s.length) { devOut('❌ 資料夾裡沒有 mp3。請先在電腦執行產生程式。'); return; }
     var local;
     try { local = JSON.parse(await manifestFile.text()); } catch (e) { devOut('❌ manifest.json 讀取失敗'); return; }
-    // 合併雲端已有的 manifest（分批上傳時不會蓋掉前面的）
+    var name = ttsVoiceShort(local.voice);
+
     await loadTtsManifest();
-    var merged = { voice: local.voice, items: Object.assign({}, (ttsManifest && ttsManifest.items) || {}) };
-    if (ttsManifest && ttsManifest.voice && ttsManifest.voice !== local.voice) {
-      if (!confirm('雲端語音包是 ' + ttsManifest.voice + '，這次是 ' + local.voice + '。\n繼續會混用兩種聲音，確定嗎？')) return;
-    }
+    var m = ttsManifest || ttsEmptyManifest();
+    var isNew = !m.voices[name];
+    var vEntry = m.voices[name] || { folder: name, items: {} };
+    m.voices[name] = vEntry;
+
     var todo = mp3s.filter(function(f) {
       var key = f.name.replace(/\.mp3$/i, '');
-      return local.items[key] && !merged.items[key];
+      return local.items[key] && !vEntry.items[key];
     });
-    devOut('上傳中 0 / ' + todo.length + '（已在雲端的會跳過）');
+    devOut('檢查雲端已有的 ' + esc(name) + ' 音檔…');
+    var already = await ttsFilesInStorage(vEntry.folder);
+    var needUpload = todo.filter(function(f) {
+      var key = f.name.replace(/\.mp3$/i, '');
+      if (already[key]) { vEntry.items[key] = ttsShortItem(local.items[key]); return false; }
+      return true;
+    });
+    var restored = todo.length - needUpload.length;
+    todo = needUpload;
+    devOut('上傳 ' + esc(name) + ' 中 0 / ' + todo.length + '（已在雲端的會跳過）');
     var done = 0, fail = 0, firstErr = '';
-    // 同時 4 個上傳，平板網路也不會卡太久
     var queue = todo.slice();
     async function worker() {
       while (queue.length) {
         var f = queue.shift();
         var key = f.name.replace(/\.mp3$/i, '');
         try {
-          await storage.ref(TTS_STORAGE_DIR + '/audio/' + key + '.mp3').put(f, { contentType: 'audio/mpeg', cacheControl: 'public,max-age=31536000' });
-          merged.items[key] = local.items[key];
+          await storage.ref(TTS_STORAGE_DIR + '/' + vEntry.folder + '/' + key + '.mp3').put(f, { contentType: 'audio/mpeg', cacheControl: 'public,max-age=31536000' });
+          vEntry.items[key] = ttsShortItem(local.items[key]);
           done++;
         } catch (e) {
           fail++;
           if (!firstErr) firstErr = e && (e.code || e.message);
         }
-        devOut('上傳中 ' + (done + fail) + ' / ' + todo.length + (fail ? '（失敗 ' + fail + '）' : ''));
+        devOut('上傳 ' + esc(name) + ' 中 ' + (done + fail) + ' / ' + todo.length + (fail ? '（失敗 ' + fail + '）' : ''));
       }
     }
     await Promise.all([worker(), worker(), worker(), worker()]);
-    if (done === 0 && fail > 0) {
+    if (done === 0 && restored === 0 && fail > 0) {
       devOut('❌ 全部上傳失敗（' + esc(String(firstErr)) + '）。<br>若是 storage/unauthorized，代表 Firebase Storage 規則不允許寫入 tts/ 資料夾，需要調整規則。');
       return;
     }
-    var blob = new Blob([JSON.stringify(merged)], { type: 'application/json' });
-    await storage.ref(TTS_STORAGE_DIR + '/manifest.json').put(blob, { contentType: 'application/json', cacheControl: 'no-cache' });
-    ttsManifest = merged;
-    ttsReady = true;
-    devOut('✅ 上傳完成：新增 ' + done + ' 個音檔' + (fail ? '，失敗 ' + fail + ' 個（再匯入一次會補傳）' : '') +
-      '。雲端共 ' + Object.keys(merged.items).length + ' 個語音。');
+    // 第一次匯入這個聲音 → 自動改用它（取代原本的聲音）
+    if (isNew || !m.wordVoice) { m.wordVoice = name; m.sentenceVoice = name; }
+    await saveTtsManifest(m);
+    devOut('✅ ' + esc(name) + '：新上傳 ' + done + ' 個' + (restored ? '、補登已在雲端的 ' + restored + ' 個' : '') +
+      (fail ? '，失敗 ' + fail + ' 個（再匯入一次會補傳）' : '') +
+      '。<br>目前單字用 <b>' + esc(m.wordVoice) + '</b>、句子用 <b>' + esc(m.sentenceVoice) + '</b>。可按「🎚️ 選擇聲音」調整。');
   };
   input.click();
 }
 
-// 開發者模式：語音包狀態（有多少單字/例句已有 Sulafat 音檔）
+// ---------- 開發者模式：選擇聲音（單字 / 句子可以不同）----------
+async function devChooseTtsVoice() {
+  await loadTtsManifest();
+  if (!ttsManifest || !Object.keys(ttsManifest.voices).length) { devOut('還沒有語音包。'); return; }
+  var names = Object.keys(ttsManifest.voices);
+  function opts(sel) {
+    return names.map(function(n) {
+      var c = Object.keys(ttsManifest.voices[n].items || {}).length;
+      return '<option value="' + esc(n) + '"' + (n === sel ? ' selected' : '') + '>' + esc(n) + '（' + c + ' 個）</option>';
+    }).join('');
+  }
+  devOut('<div class="tts-voice-pick">' +
+    '<label>念單字：<select id="ttsWordVoice">' + opts(ttsManifest.wordVoice) + '</select></label>' +
+    '<label>念句子：<select id="ttsSentenceVoice">' + opts(ttsManifest.sentenceVoice) + '</select></label>' +
+    '<div class="tts-voice-btns">' +
+      '<button class="dev-btn" onclick="devTtsPreview(\'ttsWordVoice\',\'apple\')">🔊 試聽單字</button>' +
+      '<button class="dev-btn" onclick="devTtsPreview(\'ttsSentenceVoice\',\'\')">🔊 試聽句子</button>' +
+      '<button class="dev-btn" onclick="devSaveTtsVoice()">💾 儲存</button>' +
+    '</div>' +
+    '<small>單字和句子用不同聲音，孩子會聽到兩種人的發音。某個聲音沒有的字，會自動用其他聲音補上。</small>' +
+  '</div>');
+}
+
+async function devSaveTtsVoice() {
+  var w = document.getElementById('ttsWordVoice').value;
+  var s = document.getElementById('ttsSentenceVoice').value;
+  ttsManifest.wordVoice = w;
+  ttsManifest.sentenceVoice = s;
+  await saveTtsManifest(ttsManifest);
+  devOut('✅ 已儲存：單字用 <b>' + esc(w) + '</b>、句子用 <b>' + esc(s) + '</b>。平板重新打開 App 就會套用。');
+}
+
+// 試聽：用選單裡的聲音念一個這個聲音「有的」單字或例句
+async function devTtsPreview(selectId, _) {
+  var voice = document.getElementById(selectId).value;
+  var v = ttsManifest.voices[voice];
+  if (!v) return;
+  var wantSentence = selectId === 'ttsSentenceVoice';
+  var words = await dbGetAll('words');
+  for (var i = 0; i < words.length; i++) {
+    var cands = wantSentence ? (words[i].sentences || []) : [words[i].word];
+    for (var j = 0; j < cands.length; j++) {
+      if (!cands[j]) continue;
+      var key = await ttsKey(cands[j]);
+      if (v.items[key]) {
+        var url = await ttsAudioUrl(voice, key);
+        stopSpeaking();
+        _ttsCurrent = new Audio(url);
+        _ttsCurrent.play();
+        return;
+      }
+    }
+  }
+  devOut('這個聲音還沒有' + (wantSentence ? '例句' : '單字') + '的音檔。');
+}
+
+// ---------- 開發者模式：重建語音清單（不用重傳）----------
+// 列出 Storage 上每個聲音資料夾的 mp3，寫回清單
+async function devRebuildTtsManifest() {
+  devOut('列出雲端音檔中…');
+  await loadTtsManifest();
+  var m = ttsManifest || ttsEmptyManifest();
+  // 資料夾：清單上已知的 + Storage 上 tts/ 底下所有子資料夾
+  var folders = {};
+  Object.keys(m.voices).forEach(function(n) { folders[m.voices[n].folder] = n; });
+  try {
+    var root = await storage.ref(TTS_STORAGE_DIR).listAll();
+    root.prefixes.forEach(function(p) {
+      if (!folders[p.name]) folders[p.name] = p.name === 'audio' ? 'Sulafat' : p.name;
+    });
+  } catch (e) { /* 列不到就只用已知的 */ }
+
+  var kinds = {};
+  var words = await dbGetAll('words');
+  for (var i = 0; i < words.length; i++) {
+    kinds[await ttsKey(words[i].word)] = 'w';
+    var sens = words[i].sentences || [];
+    for (var j = 0; j < sens.length; j++) if (sens[j]) { var sk = await ttsKey(sens[j]); kinds[sk] = kinds[sk] || 's'; }
+  }
+  var summary = [];
+  var fnames = Object.keys(folders);
+  for (var f = 0; f < fnames.length; f++) {
+    var folder = fnames[f], name = folders[folder];
+    var files = await ttsFilesInStorage(folder);
+    var keys = Object.keys(files);
+    if (!keys.length) { delete m.voices[name]; continue; }
+    var items = {};
+    keys.forEach(function(k) { items[k] = kinds[k] || 'w'; });
+    m.voices[name] = { folder: folder, items: items };
+    summary.push(esc(name) + ' ' + keys.length + ' 個');
+  }
+  if (!summary.length) { devOut('❌ 雲端 tts/ 裡沒有音檔（或沒有權限列出）。請先用「🎙️ 匯入語音包」上傳。'); return; }
+  if (!m.voices[m.wordVoice]) m.wordVoice = Object.keys(m.voices)[0];
+  if (!m.voices[m.sentenceVoice]) m.sentenceVoice = m.wordVoice;
+  await saveTtsManifest(m);
+  devOut('✅ 已重建：' + summary.join('、') + '。<br>目前單字用 <b>' + esc(m.wordVoice) + '</b>、句子用 <b>' + esc(m.sentenceVoice) + '</b>。');
+}
+
+// ---------- 開發者模式：刪除某個聲音（Storage 檔案 + 清單）----------
+async function devDeleteTtsVoice() {
+  await loadTtsManifest();
+  if (!ttsManifest || !Object.keys(ttsManifest.voices).length) { devOut('還沒有語音包。'); return; }
+  var names = Object.keys(ttsManifest.voices);
+  var name = prompt('要刪除哪個聲音？輸入名稱：\n' + names.join('、'));
+  if (!name || !ttsManifest.voices[name]) return;
+  if (names.length === 1 && !confirm('這是最後一個聲音，刪除後全部改用瀏覽器語音。確定？')) return;
+  if (!confirm('確定刪除 ' + name + ' 的全部音檔？此動作無法復原（可以之後重新產生並匯入）。')) return;
+  var folder = ttsManifest.voices[name].folder;
+  var keys = Object.keys(ttsManifest.voices[name].items || {});
+  var done = 0, fail = 0;
+  var queue = keys.slice();
+  async function worker() {
+    while (queue.length) {
+      var k = queue.shift();
+      try { await storage.ref(TTS_STORAGE_DIR + '/' + folder + '/' + k + '.mp3').delete(); done++; }
+      catch (e) { if (e && e.code === 'storage/object-not-found') done++; else fail++; }
+      devOut('刪除 ' + esc(name) + ' 中 ' + (done + fail) + ' / ' + keys.length);
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  delete ttsManifest.voices[name];
+  var rest = Object.keys(ttsManifest.voices);
+  if (ttsManifest.wordVoice === name) ttsManifest.wordVoice = rest[0] || '';
+  if (ttsManifest.sentenceVoice === name) ttsManifest.sentenceVoice = ttsManifest.wordVoice;
+  await saveTtsManifest(ttsManifest);
+  Object.keys(_ttsUrlCache).forEach(function(ck) { if (ck.indexOf(name + '/') === 0) delete _ttsUrlCache[ck]; });
+  saveTtsUrlCache();
+  devOut('✅ 已刪除 ' + esc(name) + '（' + done + ' 個' + (fail ? '，失敗 ' + fail + ' 個' : '') + '）。' +
+    (rest.length ? '目前用 <b>' + esc(ttsManifest.wordVoice) + '</b>。' : '目前改用瀏覽器語音。'));
+}
+
+// 開發者模式：語音包狀態（每個聲音有多少單字/例句）
 async function devTtsStatus() {
   await loadTtsManifest();
   if (!ttsReady) { devOut('還沒有語音包，目前全部用瀏覽器語音。'); return; }
   var words = await dbGetAll('words');
-  var w = 0, wHave = 0, s = 0, sHave = 0;
+  var wKeys = [], sKeys = [];
   for (var i = 0; i < words.length; i++) {
-    w++;
-    if (ttsManifest.items[await ttsKey(words[i].word)]) wHave++;
+    wKeys.push(await ttsKey(words[i].word));
     var sens = words[i].sentences || [];
-    for (var j = 0; j < sens.length; j++) {
-      if (!sens[j]) continue;
-      s++;
-      if (ttsManifest.items[await ttsKey(sens[j])]) sHave++;
-    }
+    for (var j = 0; j < sens.length; j++) if (sens[j]) sKeys.push(await ttsKey(sens[j]));
   }
-  devOut('🎙️ 聲音：' + esc(ttsManifest.voice || '') +
-    '<br>單字：' + wHave + ' / ' + w + '　例句：' + sHave + ' / ' + s +
-    '<br><small>沒有音檔的會自動用瀏覽器語音。新增單字後，再跑一次產生工具並匯入即可補上。</small>');
+  var rows = Object.keys(ttsManifest.voices).map(function(n) {
+    var it = ttsManifest.voices[n].items || {};
+    var w = wKeys.filter(function(k) { return it[k]; }).length;
+    var s = sKeys.filter(function(k) { return it[k]; }).length;
+    var tag = (n === ttsManifest.wordVoice ? '　← 單字' : '') + (n === ttsManifest.sentenceVoice ? '　← 句子' : '');
+    return '<b>' + esc(n) + '</b>：單字 ' + w + ' / ' + wKeys.length + '、例句 ' + s + ' / ' + sKeys.length + tag;
+  });
+  devOut('🎙️ ' + rows.join('<br>🎙️ ') +
+    '<br><small>選的聲音沒有的字，會自動用其他聲音補；都沒有才用瀏覽器語音。</small>');
 }
 
 // 啟動時載入（DB/Storage 就緒後）

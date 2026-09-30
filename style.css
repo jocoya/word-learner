@@ -2175,7 +2175,8 @@ body {
 .profile-card.hunt .profile-desc { color: #00695C; }
 
 /* ===== 家中尋寶遊戲 ===== */
-.hunt { max-width: 900px; width: 100%; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+/* 只套用在遊戲區裡的 .hunt（首頁「生活任務」卡片也用 .hunt 類別，不能被這條撐滿整排） */
+.game-area .hunt { max-width: 900px; width: 100%; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
 .hunt-progress { color: #00838F; font-weight: 700; font-size: 1.1em; }
 .hunt-mission { background: #fff; border-radius: 24px; padding: 24px 48px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
 .hunt-label { color: #666; font-size: 1.2em; }
@@ -2701,3 +2702,9 @@ body {
 .mp-compare .btn-sm { font-size: 1.1em; padding: 10px 18px; }
 .mp-feedback { min-height: 1.6em; font-size: 1.5em; }
 .mp-win { color: #2E7D32; font-weight: 700; }
+
+/* 開發者工具：選擇聲音 */
+.tts-voice-pick { display: flex; flex-direction: column; gap: 10px; }
+.tts-voice-pick label { display: flex; align-items: center; gap: 8px; }
+.tts-voice-pick select { padding: 6px 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 1em; }
+.tts-voice-btns { display: flex; gap: 8px; flex-wrap: wrap; }

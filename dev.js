@@ -55,8 +55,11 @@ function openDevPanel() {
         '<button class="dev-btn" onclick="devPreviewAnimations()">🎬 預覽動畫</button>' +
         '<button class="dev-btn" onclick="devAddCoins()">💰 增加金幣/鑽石（可選數量）</button>' +
         '<button class="dev-btn" onclick="devTestVoices()">🔊 測試語音</button>' +
-        '<button class="dev-btn" onclick="devImportTtsPack()">🎙️ 匯入語音包（Sulafat）</button>' +
+        '<button class="dev-btn" onclick="devImportTtsPack()">🎙️ 匯入語音包</button>' +
+        '<button class="dev-btn" onclick="devChooseTtsVoice()">🎚️ 選擇聲音（單字/句子）</button>' +
         '<button class="dev-btn" onclick="devTtsStatus()">📈 語音包狀態</button>' +
+        '<button class="dev-btn" onclick="devRebuildTtsManifest()">🧩 重建語音清單（不用重傳）</button>' +
+        '<button class="dev-btn dev-danger" onclick="devDeleteTtsVoice()">🗑️ 刪除某個聲音</button>' +
         '<button class="dev-btn" onclick="devShowDataInfo()">📊 資料檢視</button>' +
         '<button class="dev-btn" onclick="openCloudManager()">☁️ 雲端圖片管理</button>' +
         '<button class="dev-btn" onclick="devToggleFastMode()">⏩ 快速模式：' + (window.DEV_FAST ? '開' : '關') + '</button>' +

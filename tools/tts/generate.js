@@ -7,7 +7,10 @@
 //   node tools/tts/generate.js <備份檔.json> --sample        先做 5 個字試聽（預設）
 //   node tools/tts/generate.js <備份檔.json> --words         只做單字
 //   node tools/tts/generate.js <備份檔.json> --all           單字 + 例句
+//   加 --voice Achird   用指定聲音（沒加就用 config.json 的 voice）
 //   加 --dry  只估算字元數，不呼叫 API
+//
+// 多聲音：每個聲音輸出到 output/<聲音名>/，互不覆蓋；App 裡可切換或混用
 //
 // 設計：
 //   - 檔名 = 文字雜湊（同一句話永遠同一個檔），已產生過的自動跳過，中斷後可接著跑
@@ -20,11 +23,21 @@ const path = require('path');
 const crypto = require('crypto');
 
 const TOOL_DIR = __dirname;
-const OUT_DIR = path.join(TOOL_DIR, 'output');
-const AUDIO_DIR = path.join(OUT_DIR, 'audio');
-const MANIFEST = path.join(OUT_DIR, 'manifest.json');
-const USAGE = path.join(OUT_DIR, 'usage.json');
+const OUT_ROOT = path.join(TOOL_DIR, 'output');
+// 用量記錄是整個專案共用（免費額度是專案層級），放在 output 根目錄
+const USAGE = path.join(OUT_ROOT, 'usage.json');
 const SAMPLE_COUNT = 5;
+
+// 聲音短名：en-US-Chirp3-HD-Achird → Achird（資料夾與 Storage 路徑都用它）
+function voiceShort(voice) {
+  const m = String(voice || '').match(/([A-Za-z]+)$/);
+  return m ? m[1] : 'voice';
+}
+// 每個聲音一個資料夾：output/<短名>/audio/*.mp3 + output/<短名>/manifest.json
+function voicePaths(voice) {
+  const dir = path.join(OUT_ROOT, voiceShort(voice));
+  return { dir, audio: path.join(dir, 'audio'), manifest: path.join(dir, 'manifest.json') };
+}
 
 // ---------- 共用：文字正規化與雜湊（必須和 App 端 tts.js 完全一致）----------
 function ttsNormalize(text) {
@@ -110,15 +123,22 @@ async function main() {
   if (!fs.existsSync(file)) fail('找不到備份檔：' + file);
 
   const cfg = dry ? Object.assign({ monthlyCharBudget: 900000, requestsPerMinute: 150, voice: 'en-US-Chirp3-HD-Sulafat' }, readJson(path.join(TOOL_DIR, 'config.json'), {})) : loadConfig();
+  // --voice Achird 或 --voice en-US-Chirp3-HD-Achird
+  const vi = args.indexOf('--voice');
+  if (vi !== -1 && args[vi + 1]) {
+    const v = args[vi + 1];
+    cfg.voice = /^[a-z]{2}-[A-Z]{2}-/.test(v) ? v : (cfg.languageCode || 'en-US') + '-Chirp3-HD-' + v.charAt(0).toUpperCase() + v.slice(1);
+  }
   const backup = readJson(file, null);
   if (!backup || !Array.isArray(backup.words)) fail('備份檔格式不對（需要 App「匯出全部資料」產生的 JSON）。');
 
-  fs.mkdirSync(AUDIO_DIR, { recursive: true });
-  const manifest = readJson(MANIFEST, { voice: cfg.voice, items: {} });
-  if (manifest.voice && manifest.voice !== cfg.voice) {
-    fail('output 裡的音檔是用 ' + manifest.voice + ' 做的，但 config 設的是 ' + cfg.voice + '。\n要換聲音請先把 tools/tts/output 資料夾改名或刪除。');
-  }
+  const P = voicePaths(cfg.voice);
+  migrateOldOutput();
+  fs.mkdirSync(P.audio, { recursive: true });
+  const manifest = readJson(P.manifest, { voice: cfg.voice, items: {} });
   manifest.voice = cfg.voice;
+  const AUDIO_DIR = P.audio;
+  const writeManifest = (m) => fs.writeFileSync(P.manifest, JSON.stringify(m, null, 1));
 
   let items = collectTexts(backup, mode === 'sample' ? 'words' : mode);
   if (mode === 'sample') items = items.slice(0, SAMPLE_COUNT);
@@ -165,14 +185,28 @@ async function main() {
   console.log('\n\n✅ 完成 ' + done + ' 筆' + (failed ? '，失敗 ' + failed + ' 筆（再跑一次會重試失敗的）' : '') + '。');
   console.log('   音檔在：' + AUDIO_DIR);
   if (mode === 'sample') console.log('   先打開幾個 mp3 試聽，滿意再用 --words 或 --all 做全部。');
-  console.log('   上傳：電腦 Chrome 開 App → 首頁標題連點 3 下 → 🎙️ 匯入語音包 → 選 tools\\tts\\output 資料夾\n');
+  console.log('   上傳：電腦 Chrome 開 App → 首頁標題連點 3 下 → 🎙️ 匯入語音包 → 選 tools\\tts\\output\\' + voiceShort(cfg.voice) + ' 資料夾\n');
 }
 
-function writeManifest(m) { fs.writeFileSync(MANIFEST, JSON.stringify(m, null, 1)); }
-function saveUsage(u, month, value) { u[month] = value; fs.writeFileSync(USAGE, JSON.stringify(u, null, 1)); }
+// 舊版（v69）輸出在 output/audio + output/manifest.json → 搬到 output/<聲音名>/
+function migrateOldOutput() {
+  const oldManifest = path.join(OUT_ROOT, 'manifest.json');
+  const oldAudio = path.join(OUT_ROOT, 'audio');
+  if (!fs.existsSync(oldManifest)) return;
+  const m = readJson(oldManifest, null);
+  if (!m || !m.voice) return;
+  const P = voicePaths(m.voice);
+  if (fs.existsSync(P.manifest)) return;
+  fs.mkdirSync(P.dir, { recursive: true });
+  if (fs.existsSync(oldAudio)) fs.renameSync(oldAudio, P.audio);
+  fs.renameSync(oldManifest, P.manifest);
+  console.log('   （已把舊的 ' + voiceShort(m.voice) + ' 音檔搬到 output\\' + voiceShort(m.voice) + '）');
+}
+
+function saveUsage(u, month, value) { fs.mkdirSync(OUT_ROOT, { recursive: true }); u[month] = value; fs.writeFileSync(USAGE, JSON.stringify(u, null, 1)); }
 
 if (require.main === module) {
   main().catch(e => fail(e.stack || e.message));
 }
 
-module.exports = { ttsNormalize, ttsKey, collectTexts };
+module.exports = { ttsNormalize, ttsKey, collectTexts, voiceShort, voicePaths };
