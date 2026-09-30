@@ -1,6 +1,6 @@
-const CACHE = 'word-learner-v72';
+const CACHE = 'word-learner-v73';
 const MEDIA_CACHE = 'word-learner-media'; // 圖片/音檔（跨版本保留，不隨程式更新清掉）
-const V = '?v=70';
+const V = '?v=73';
 const ASSETS = [
   './index.html',
   './style.css' + V,
@@ -72,22 +72,15 @@ self.addEventListener('fetch', function(e) {
       url.hostname.includes('firestore.googleapis.com') ||
       url.hostname.includes('identitytoolkit.googleapis.com')) return;
 
-  // Firebase Storage 圖片/音檔：快取優先（離線可用、重複秒開）
-  // 第一次讀 → 下載並存快取；之後 → 直接給快取，背景更新
+  // Firebase Storage 圖片/音檔：快取優先，存在平板上（離線可用、重複秒開）
+  // 網址帶有檔案 token，同一個網址內容不會變 → 有快取就直接用，不再背景重抓
+  // 注意：<img>/<audio> 發出的是 no-cors 請求（回應是 opaque、status 0），
+  //       <audio> 還會帶 Range（回 206）；這兩種都存不進快取。
+  //       所以這裡改用 CORS 抓「完整檔案」存起來，再依 Range 切片回給 <audio>。
   var isStorageAsset = url.hostname.includes('firebasestorage.googleapis.com') ||
                        url.hostname.includes('storage.googleapis.com');
   if (isStorageAsset) {
-    e.respondWith(
-      caches.open(MEDIA_CACHE).then(function(c) {
-        return c.match(e.request).then(function(cached) {
-          var network = fetch(e.request).then(function(res) {
-            if (res && res.status === 200) c.put(e.request, res.clone());
-            return res;
-          }).catch(function() { return cached; });
-          return cached || network;
-        });
-      })
-    );
+    e.respondWith(serveMedia(e.request));
     return;
   }
 
@@ -103,11 +96,76 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  // 本地資源：快取優先
+  // 本地資源：快取優先；沒有的（例如版本參數不同）抓下來後也存進目前版本的快取
   e.respondWith(
-    caches.match(e.request).then(function(cached) { return cached || fetch(e.request); })
+    caches.match(e.request).then(function(cached) {
+      if (cached) return cached;
+      return fetch(e.request).then(function(res) {
+        if (res && res.status === 200 && res.type === 'basic') {
+          var clone = res.clone();
+          caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
+        }
+        return res;
+      });
+    })
   );
 });
+
+// ===== 媒體快取：完整檔案存起來，依 Range 回應 =====
+async function serveMedia(req) {
+  var c = await caches.open(MEDIA_CACHE);
+  var key = req.url;
+  var cached = await c.match(key);
+  if (cached) return withRange(req, cached);
+
+  var res;
+  try {
+    // 不帶 Range、用 CORS 抓完整檔案 → status 200，可以存
+    res = await fetch(key, { mode: 'cors', credentials: 'omit' });
+  } catch (err) {
+    // 不支援 CORS 的外部圖片：退回原本的請求（opaque，只能給圖片用）
+    try {
+      res = await fetch(req);
+      if (res && res.type === 'opaque' && !req.headers.get('range')) c.put(key, res.clone()).catch(function() {});
+      return res;
+    } catch (err2) {
+      return new Response('', { status: 504, statusText: 'offline' });
+    }
+  }
+  if (res && res.status === 200) {
+    try { await c.put(key, res.clone()); } catch (err) { /* 空間不足：這次不存 */ }
+  }
+  return withRange(req, res);
+}
+
+// <audio> 會要求 bytes=0- 這類片段（Safari 一定要 206 才能播）
+async function withRange(req, res) {
+  var range = req.headers.get('range');
+  if (!range || !res || res.status !== 200) return res;
+  var m = /bytes=(\d*)-(\d*)/.exec(range);
+  if (!m) return res;
+  var buf = await res.arrayBuffer();
+  var size = buf.byteLength;
+  var start, end;
+  if (m[1] === '' && m[2] !== '') {          // bytes=-500：最後 500 bytes
+    start = Math.max(0, size - Number(m[2])); end = size - 1;
+  } else {
+    start = Number(m[1] || 0);
+    end = m[2] !== '' ? Math.min(Number(m[2]), size - 1) : size - 1;
+  }
+  if (start >= size || start > end) {
+    return new Response(null, { status: 416, headers: { 'Content-Range': 'bytes */' + size } });
+  }
+  return new Response(buf.slice(start, end + 1), {
+    status: 206,
+    headers: {
+      'Content-Type': res.headers.get('Content-Type') || 'audio/mpeg',
+      'Content-Range': 'bytes ' + start + '-' + end + '/' + size,
+      'Content-Length': String(end - start + 1),
+      'Accept-Ranges': 'bytes'
+    }
+  });
+}
 
 // ===== 與頁面溝通：清除媒體快取、回報版本 =====
 self.addEventListener('message', function(e) {

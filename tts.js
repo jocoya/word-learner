@@ -462,7 +462,81 @@ async function devTtsStatus() {
     '<br><small>選的聲音沒有的字，會自動用其他聲音補；都沒有才用瀏覽器語音。</small>');
 }
 
-// 啟動時載入（DB/Storage 就緒後）
+// ===== 背景預抓音檔：把所有單字/例句的音檔先存進平板（Service Worker 媒體快取）=====
+// 只抓「目前會播放的那個聲音」；已抓過的記在 localStorage，之後只補新的。
+// 一次 3 個、每批間隔一下，不影響遊戲。
+var TTS_PREFETCH_LS = 'ttsPrefetched1';
+var _ttsPrefetching = false;
+async function precacheTtsAudio() {
+  if (_ttsPrefetching || !ttsReady || !navigator.onLine || typeof dbGetAll !== 'function') return;
+  _ttsPrefetching = true;
+  try {
+    var done = {};
+    try { done = JSON.parse(localStorage.getItem(TTS_PREFETCH_LS) || '{}'); } catch (e) { done = {}; }
+    var media = ('caches' in window) ? await caches.open('word-learner-media') : null;
+    var words = await dbGetAll('words');
+    var jobs = [], seen = {};
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      var texts = [w.word].concat(w.sentences || []);
+      for (var j = 0; j < texts.length; j++) {
+        var t = String(texts[j] || '').trim();
+        if (!t) continue;
+        var key = await ttsKey(t);
+        var voice = ttsPickVoice(key, ttsIsSentence(key, t));
+        if (!voice) continue;
+        var ck = voice + '/' + key;
+        if (seen[ck] || done[ck]) continue;
+        seen[ck] = true;
+        jobs.push(ck);
+      }
+    }
+    var idx = 0;
+    var worker = async function() {
+      while (idx < jobs.length && navigator.onLine) {
+        var ck2 = jobs[idx++];
+        var parts = ck2.split('/');
+        try {
+          var url = await ttsAudioUrl(parts[0], parts[1]);
+          // 已在快取就不用再抓
+          var hit = media ? await media.match(url) : null;
+          if (!hit) {
+            var r = await fetch(url);          // 經過 Service Worker → 存進媒體快取
+            if (!r.ok) continue;
+            await r.arrayBuffer();
+            // Service Worker 還沒接管（第一次開 App）時不會存到 → 不記錄，下次再抓
+            hit = media ? await media.match(url) : null;
+          }
+          if (hit) done[ck2] = 1;
+        } catch (e) { /* 這個先跳過，下次再試 */ }
+        if (idx % 20 === 0) { try { localStorage.setItem(TTS_PREFETCH_LS, JSON.stringify(done)); } catch (e) {} }
+        await new Promise(function(r2) { setTimeout(r2, 80); });
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    try { localStorage.setItem(TTS_PREFETCH_LS, JSON.stringify(done)); } catch (e) {}
+  } finally {
+    _ttsPrefetching = false;
+  }
+}
+
+// 請瀏覽器把這個 App 的資料設為「持久保存」，空間不足時才不會被自動清掉
+function ttsRequestPersist() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then(function(p) { if (!p) navigator.storage.persist(); });
+    }
+  } catch (e) {}
+}
+
+// 啟動時載入（DB/Storage 就緒後），再背景預抓音檔
 if (typeof window !== 'undefined') {
-  window.addEventListener('load', function() { setTimeout(loadTtsManifest, 800); });
+  window.addEventListener('load', function() {
+    ttsRequestPersist();
+    setTimeout(function() {
+      loadTtsManifest().then(function(ok) {
+        if (ok) setTimeout(precacheTtsAudio, 4000);   // 讓圖片預抓先跑一下
+      });
+    }, 800);
+  });
 }

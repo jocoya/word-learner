@@ -859,11 +859,30 @@ async function renderWordList() {
         ${hasImg ? '📷' : ''}${hasSen ? '📝' : ''}
       </div>
       <div class="word-item-actions">
+        <button class="btn-sm" onclick="manageSpeak(${w.id}, 'word')" aria-label="念單字" title="念單字">🔊</button>
+        ${hasSen ? `<button class="btn-sm" onclick="manageSpeak(${w.id}, 'sentences')" aria-label="念例句" title="念例句">🗣️</button>` : ''}
         <button class="btn-sm" onclick="editWord(${w.id})">✏️</button>
         <button class="btn-sm btn-red" onclick="deleteWord(${w.id})">🗑️</button>
       </div>
     </div>`;
   }).join('') || '<p style="color:#999;text-align:center;padding:20px;">還沒有單字，快來新增吧！</p>';
+}
+
+// 管理頁試聽：🔊 念單字，🗣️ 依序念完所有例句
+let _manageSpeakRun = 0;
+async function manageSpeak(id, mode) {
+  const w = await dbGet('words', id); if (!w) return;
+  if (mode === 'word') _manageSpeakRun++;
+  // speakText 的 0.8 = 音檔原速播放；按別的按鈕會中斷目前的朗讀
+  if (mode === 'word') { speakText(w.word, 0.8); return; }
+  const list = (w.sentences || []).map(s => String(s || '').trim()).filter(Boolean);
+  const run = ++_manageSpeakRun;
+  let i = 0;
+  (function next() {
+    // 已經按了別的發音按鈕（瀏覽器語音被取消時也會觸發 onDone）→ 不再接著念
+    if (run !== _manageSpeakRun || i >= list.length) return;
+    speakText(list[i++], 0.8, next);
+  })();
 }
 
 function getWordImage(w) {
@@ -1068,6 +1087,8 @@ async function renderExamWordList() {
     <div class="word-item">
       ${getWordImage(w)}
       <div class="word-item-info"><div class="word-item-word">${esc(w.word)}</div><div class="word-item-meaning">${esc(w.meaning)}</div></div>
+      <button class="btn-sm" onclick="manageSpeak(${w.id}, 'word')" aria-label="念單字" title="念單字">🔊</button>
+      ${w.sentences && w.sentences.length ? `<button class="btn-sm" onclick="manageSpeak(${w.id}, 'sentences')" aria-label="念例句" title="念例句">🗣️</button>` : ''}
       <button class="btn-sm" onclick="editWord(${w.id})">✏️</button>
       <button class="btn-sm btn-red" onclick="deleteExamWord(${w.id})">🗑️</button>
     </div>`).join('') || '<p style="color:#999;text-align:center;padding:20px;">還沒有單字</p>';
