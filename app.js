@@ -1267,6 +1267,7 @@ function getAllImages(w) {
 }
 function getImageSrc(w) { const imgs=getAllImages(w); return imgs.length>0?imgs[0]:''; }
 function getRandomImage(w) { const imgs=getAllImages(w); return imgs.length===0?'':imgs[Math.floor(Math.random()*imgs.length)]; }
+// 發音：tts.js 載入後會以 Sulafat 音檔優先的版本取代這個函式（這裡只是備援）
 function speakWord(word, rate=0.8) { const u=new SpeechSynthesisUtterance(word); u.lang='en-US'; u.rate=rate; speechSynthesis.speak(u); }
 function getRandomSentence(w) { if(!w.sentences||w.sentences.length===0)return null; return w.sentences[Math.floor(Math.random()*w.sentences.length)]; }
 function parseTags(str) { return str.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean); }

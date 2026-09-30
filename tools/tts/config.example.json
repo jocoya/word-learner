@@ -1,0 +1,8 @@
+{
+  "apiKey": "把 word-learner-tts 那把 API 金鑰貼在這裡（這個檔案要另存成 config.json）",
+  "voice": "en-US-Chirp3-HD-Sulafat",
+  "languageCode": "en-US",
+  "speakingRate": 0.9,
+  "monthlyCharBudget": 900000,
+  "requestsPerMinute": 150
+}

@@ -1,0 +1,8 @@
+# 語音產生工具：金鑰設定與產生的音檔只留在本機，不進版本控制
+tools/tts/config.json
+tools/tts/output/
+tools/tts/*.log
+
+# 從 App 匯出的資料（含單字與學習進度）
+*-backup-*.json
+word-learner-backup*.json

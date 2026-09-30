@@ -410,11 +410,15 @@ function toggleStoryZh() {
 
 function speakStoryPage(onDone) {
   var p = storyViewing && storyViewing.pages[storyPageIdx];
-  if (!p || !('speechSynthesis' in window)) { if (onDone) onDone(); return; }
+  if (!p) { if (onDone) onDone(); return; }
+  var rate = parseFloat(storyEl('storyRate').value) || 0.75;
+  // 有 Sulafat 音檔就播音檔（故事是 AI 即時寫的，通常沒有，會自動用瀏覽器語音）
+  if (typeof speakText === 'function') { speakText(p.en, rate, onDone); return; }
+  if (!('speechSynthesis' in window)) { if (onDone) onDone(); return; }
   speechSynthesis.cancel();
   var u = new SpeechSynthesisUtterance(p.en);
   u.lang = 'en-US';
-  u.rate = parseFloat(storyEl('storyRate').value) || 0.75;
+  u.rate = rate;
   u.onend = function() { if (onDone) onDone(); };
   u.onerror = function() { if (onDone) onDone(); };
   speechSynthesis.speak(u);
@@ -448,7 +452,8 @@ function toggleStoryAutoRead() {
 
 function stopStoryReading() {
   storyReading = false;
-  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (typeof stopSpeaking === 'function') stopSpeaking();
+  else if ('speechSynthesis' in window) speechSynthesis.cancel();
   updateStoryReadBtn();
 }
 

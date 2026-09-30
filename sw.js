@@ -1,6 +1,6 @@
-const CACHE = 'word-learner-v68';
+const CACHE = 'word-learner-v69';
 const MEDIA_CACHE = 'word-learner-media'; // 圖片/音檔（跨版本保留，不隨程式更新清掉）
-const V = '?v=68';
+const V = '?v=69';
 const ASSETS = [
   './index.html',
   './style.css' + V,
@@ -14,6 +14,7 @@ const ASSETS = [
   './dev.js' + V,
   './cloud.js' + V,
   './monster.js' + V,
+  './tts.js' + V,
   './stories.js' + V,
   './games/memory.js' + V,
   './games/listen.js' + V,
@@ -75,6 +76,18 @@ self.addEventListener('fetch', function(e) {
   // 第一次讀 → 下載並存快取；之後 → 直接給快取，背景更新
   var isStorageAsset = url.hostname.includes('firebasestorage.googleapis.com') ||
                        url.hostname.includes('storage.googleapis.com');
+  // 語音包 manifest 會更新（新增音檔）→ 網路優先，離線才用快取；音檔本身內容不變，照舊快取優先
+  if (isStorageAsset && url.pathname.indexOf('tts%2Fmanifest.json') !== -1) {
+    e.respondWith(
+      caches.open(MEDIA_CACHE).then(function(c) {
+        return fetch(e.request).then(function(res) {
+          if (res && res.status === 200) c.put(e.request, res.clone());
+          return res;
+        }).catch(function() { return c.match(e.request); });
+      })
+    );
+    return;
+  }
   if (isStorageAsset) {
     e.respondWith(
       caches.open(MEDIA_CACHE).then(function(c) {
