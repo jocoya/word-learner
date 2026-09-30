@@ -688,26 +688,82 @@ function selectSearchImage(el, resultsContainerId) {
 }
 
 // ===== 單字管理 =====
+// 拍照/選圖：先縮小（長邊 800px、JPEG 0.8，約 80–150 KB），再上傳 Firebase Storage
+// 原本整張相機原圖（2–4 MB）直接以 data URL 存進單字資料，太大。
+const PHOTO_MAX_SIDE = 800;
+const PHOTO_QUALITY = 0.8;
+
+function compressImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';                       // PNG 透明底轉 JPEG 時不會變黑
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(b => {
+        if (b) resolve({ blob: b, dataUrl: canvas.toDataURL('image/jpeg', PHOTO_QUALITY) });
+        else reject(new Error('照片轉檔失敗'));
+      }, 'image/jpeg', PHOTO_QUALITY);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('照片讀取失敗')); };
+    img.src = url;
+  });
+}
+
+// 上傳縮小後的照片；離線或失敗 → 回傳 data URL（已縮小，只存在單字資料裡）
+async function uploadWordPhoto(photo) {
+  if (!navigator.onLine || typeof storage === 'undefined') return photo.dataUrl;
+  try {
+    const ref = storage.ref('word_images/photo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.jpg');
+    const snap = await ref.put(photo.blob, { contentType: 'image/jpeg' });
+    return await snap.ref.getDownloadURL();
+  } catch (e) {
+    console.warn('照片上傳失敗，改存本機：', e.message);
+    return photo.dataUrl;
+  }
+}
+
+// 共用：縮小 → 先顯示預覽 → 背景上傳 → 完成後把網址交給 setSrc
+async function processPickedPhoto(e, setSrc, showPreview) {
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  e.target.value = '';                               // 同一張可以再選一次
+  let photo;
+  try { photo = await compressImageFile(file); }
+  catch (err) { alert(err.message); return; }
+  setSrc(photo.dataUrl);
+  showPreview(photo.dataUrl, '⏳ 上傳中…（' + Math.round(photo.blob.size / 1024) + ' KB）');
+  const src = await uploadWordPhoto(photo);
+  setSrc(src);
+  showPreview(src, src.indexOf('data:') === 0 ? '📱 已縮小，存在本機（離線）' : '✅ 已上傳（' + Math.round(photo.blob.size / 1024) + ' KB）');
+}
+
 function handleImageUpload(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    localImageData = ev.target.result;
-    const preview = document.getElementById('imagePreview');
-    preview.innerHTML = `<img src="${localImageData}" alt="預覽" />`; preview.hidden = false;
-  };
-  reader.readAsDataURL(file);
+  const preview = document.getElementById('imagePreview');
+  let mine = null;   // 上傳中就按了新增（表單已清空）→ 上傳完不要再塞進下一個單字
+  processPickedPhoto(e, src => {
+    if (mine === null || localImageData === mine) { localImageData = src; mine = src; }
+  }, (src, note) => {
+    if (localImageData !== src) return;
+    preview.innerHTML = `<img src="${esc(src)}" alt="預覽" /><div class="photo-note">${note}</div>`; preview.hidden = false;
+  });
 }
 
 function handleExamImageUpload(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    examLocalImageData = ev.target.result;
-    const preview = document.getElementById('examImagePreview');
-    preview.innerHTML = `<img src="${examLocalImageData}" alt="預覽" />`; preview.hidden = false;
-  };
-  reader.readAsDataURL(file);
+  const preview = document.getElementById('examImagePreview');
+  let mine = null;
+  processPickedPhoto(e, src => {
+    if (mine === null || examLocalImageData === mine) { examLocalImageData = src; mine = src; }
+  }, (src, note) => {
+    if (examLocalImageData !== src) return;
+    preview.innerHTML = `<img src="${esc(src)}" alt="預覽" /><div class="photo-note">${note}</div>`; preview.hidden = false;
+  });
 }
 
 function parseTags(str) {
@@ -976,18 +1032,17 @@ function addEditImageRow(url) {
 }
 
 function handleEditImageUpload(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const c = document.getElementById('editImagesContainer');
-    const d = document.createElement('div'); d.className = 'form-row edit-img-row';
-    d.innerHTML = `<input type="text" class="edit-img-url" value="${ev.target.result}" style="flex:1;" readonly /><button class="btn-sm btn-red" onclick="this.parentElement.remove()">✕</button>`;
-    c.appendChild(d);
-    const img = document.createElement('img');
-    img.src = ev.target.result; img.style.cssText = 'max-height:60px;border-radius:6px;';
-    document.getElementById('editImagePreview').appendChild(img);
-  };
-  reader.readAsDataURL(file);
+  const c = document.getElementById('editImagesContainer');
+  const d = document.createElement('div'); d.className = 'form-row edit-img-row';
+  d.innerHTML = `<input type="text" class="edit-img-url" style="flex:1;" readonly /><button class="btn-sm btn-red" onclick="this.parentElement.remove()">✕</button>`;
+  const input = d.querySelector('input');
+  const img = document.createElement('img');
+  img.style.cssText = 'max-height:60px;border-radius:6px;';
+  let added = false;
+  processPickedPhoto(e, src => { input.value = src; }, (src, note) => {
+    if (!added) { c.appendChild(d); document.getElementById('editImagePreview').appendChild(img); added = true; }
+    img.src = src; img.title = note;
+  });
 }
 
 async function saveEditWord(id) {

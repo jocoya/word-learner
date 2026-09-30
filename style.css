@@ -124,6 +124,7 @@ body {
 .form-row input:focus { border-color: #667eea; }
 .image-preview { margin: 8px 0; }
 .image-preview img { max-height: 100px; border-radius: 8px; }
+.photo-note { font-size: .85em; color: #666; margin-top: 4px; }
 
 /* Word list */
 .word-list-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }

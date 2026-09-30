@@ -260,13 +260,75 @@ async function devShowDataInfo() {
   var girlP = progress.filter(function(p){ return typeof p.wordId === 'string' && p.wordId.indexOf('_girl') !== -1; });
   var online = navigator.onLine ? '🟢 連線' : '🔴 離線';
   var uid = (typeof currentUserId !== 'undefined' && currentUserId) ? currentUserId.slice(0, 8) + '...' : '(無)';
-  devOut(
+  var base =
     '永久庫單字：' + perm.length + '<br>' +
     '考試包單字：' + exam.length + '<br>' +
     '進度紀錄：' + progress.length + '（男 ' + boyP.length + ' / 女 ' + girlP.length + '）<br>' +
     '網路：' + online + '<br>' +
-    'Firebase UID：' + uid
-  );
+    'Firebase UID：' + uid;
+  devOut(base + '<br><br>💾 計算平板空間中…');
+  var usage = await devStorageUsage(words);
+  devOut(base + '<br><br>' + usage);
+}
+
+function devFmtSize(bytes) {
+  if (!bytes) return '0 KB';
+  if (bytes < 1048576) return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// 💾 平板空間：媒體快取（圖片/音檔分開算）、程式快取、單字資料、瀏覽器總用量
+async function devStorageUsage(words) {
+  var lines = ['<b>💾 平板空間</b>'];
+  try {
+    var img = { n: 0, b: 0 }, aud = { n: 0, b: 0 }, other = { n: 0, b: 0 }, app = { n: 0, b: 0 };
+    if ('caches' in window) {
+      var names = await caches.keys();
+      for (var i = 0; i < names.length; i++) {
+        var c = await caches.open(names[i]);
+        var reqs = await c.keys();
+        var isMedia = names[i].indexOf('media') !== -1;
+        for (var j = 0; j < reqs.length; j++) {
+          var res = await c.match(reqs[j]);
+          var size = 0;
+          // opaque（跨網域 no-cors）讀不到內容大小，只算數量
+          if (res && res.type !== 'opaque') {
+            var len = Number(res.headers.get('Content-Length') || 0);
+            size = len || (await res.clone().blob()).size;
+          }
+          var u = decodeURIComponent(reqs[j].url);
+          var bucket = !isMedia ? app
+            : (/\/tts\/|\.mp3/i.test(u) ? aud : (/\.(jpe?g|png|webp|gif)|word_images|images/i.test(u) ? img : other));
+          bucket.n++; bucket.b += size;
+        }
+      }
+    }
+    lines.push('🖼️ 圖片快取：' + img.n + ' 張，' + devFmtSize(img.b));
+    lines.push('🔊 音檔快取：' + aud.n + ' 個，' + devFmtSize(aud.b));
+    if (other.n) lines.push('📦 其他媒體：' + other.n + ' 個，' + devFmtSize(other.b));
+    lines.push('⚙️ 程式檔案：' + devFmtSize(app.b));
+  } catch (e) {
+    lines.push('快取統計失敗：' + e.message);
+  }
+  // 單字資料裡直接存的圖片（舊版拍照、離線時拍的照片是 data URL，會跟著資料同步）
+  var inline = 0, inlineN = 0;
+  (words || []).forEach(function(w) {
+    getAllImages(w).concat(w.huntPhotos || []).forEach(function(s) {
+      if (s && String(s).indexOf('data:') === 0) { inline += s.length * 0.75; inlineN++; }
+    });
+  });
+  lines.push('📝 單字資料內的照片：' + inlineN + ' 張，約 ' + devFmtSize(inline));
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      var est = await navigator.storage.estimate();
+      var persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+      lines.push('📊 這個 App 總共使用：' + devFmtSize(est.usage || 0) +
+        (est.quota ? '（瀏覽器允許上限約 ' + devFmtSize(est.quota) + '）' : ''));
+      lines.push('🔒 持久保存：' + (persisted ? '是（空間不足時不會被自動清掉）' : '否'));
+    }
+  } catch (e) {}
+  lines.push('<small>想釋放空間：首頁上方的「🗑️ 清除快取」，單字與進度不受影響。</small>');
+  return lines.join('<br>');
 }
 
 // ⏩ 快速模式（縮短遊戲間等待）
